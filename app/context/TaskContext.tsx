@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { Task } from '@/types/task';
+import { Task } from '../types/task';
 
 interface Transition {
   id: string;
@@ -39,7 +39,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         fetchedTasks.push({
           id: doc.id,
           title: data.title,
-          list: data.list,
+          completed: data.completed || false,
+          isTrap: data.isTrap || false,
           createdAt: data.createdAt.toDate(),
           completedAt: data.completedAt ? data.completedAt.toDate() : undefined,
         });

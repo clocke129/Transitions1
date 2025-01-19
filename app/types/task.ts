@@ -4,4 +4,5 @@ export interface Task {
   completed: boolean;
   isTrap: boolean;
   createdAt: Date;
-} 
+  completedAt?: Date;
+}
