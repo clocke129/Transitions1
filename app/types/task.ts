@@ -1,7 +1,7 @@
 export interface Task {
   id: string;
   title: string;
-  list: 'queue' | 'today' | 'done';
+  completed: boolean;
+  isTrap: boolean;
   createdAt: Date;
-  completedAt?: Date;
 } 

@@ -1,19 +1,33 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Task } from '@/types/task';
 
-interface TaskContextType {
+interface Transition {
+  id: string;
+  number: number;
   tasks: Task[];
-  addTask: (title: string, list: 'queue' | 'today') => Promise<void>;
-  moveTask: (taskId: string, toList: 'queue' | 'today' | 'done') => Promise<void>;
-  deleteTask: (taskId: string) => Promise<void>;
+  startTime?: Date;
+}
+
+interface TaskContextType {
+  currentTransition: Transition;
+  tasks: Task[];
+  addTask: (title: string) => void;
+  toggleTask: (taskId: string) => void;
+  toggleTrap: (taskId: string) => void;
+  archiveTransition: (elapsedTime: number) => Promise<void>;
 }
 
 export const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [transitionCount, setTransitionCount] = useState(1);
+  const [currentTransition, setCurrentTransition] = useState<Transition>({
+    id: '1',
+    number: 1,
+    tasks: [],
+  });
 
   // Fetch tasks when component mounts
   useEffect(() => {
@@ -30,62 +44,131 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           completedAt: data.completedAt ? data.completedAt.toDate() : undefined,
         });
       });
-      setTasks(fetchedTasks);
+      setCurrentTransition(prev => ({
+        ...prev,
+        tasks: fetchedTasks,
+      }));
     };
 
     fetchTasks();
   }, []);
 
-  const addTask = async (title: string, list: 'queue' | 'today') => {
+  const addTask = async (title: string) => {
     try {
-      const docRef = await addDoc(collection(db, 'tasks'), {
-        title,
-        list,
-        createdAt: new Date(),
-      });
-
       const newTask: Task = {
-        id: docRef.id,
+        id: Date.now().toString(),
         title,
-        list,
+        completed: false,
+        isTrap: false,
         createdAt: new Date(),
       };
 
-      setTasks([...tasks, newTask]);
-    } catch (error) {
-      console.error('Error adding task: ', error);
-    }
-  };
-
-  const moveTask = async (taskId: string, toList: 'queue' | 'today' | 'done') => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      await updateDoc(taskRef, {
-        list: toList,
-        ...(toList === 'done' ? { completedAt: new Date() } : {}),
+      // Add to Firestore first
+      const docRef = await addDoc(collection(db, 'tasks'), {
+        ...newTask,
+        transitionNumber: currentTransition.number,
       });
 
-      setTasks(tasks.map(task => 
-        task.id === taskId 
-          ? { ...task, list: toList, ...(toList === 'done' ? { completedAt: new Date() } : {}) }
-          : task
-      ));
+      // Then update local state
+      setCurrentTransition(prev => ({
+        ...prev,
+        tasks: [...prev.tasks, { ...newTask, id: docRef.id }],
+      }));
     } catch (error) {
-      console.error('Error moving task: ', error);
+      console.error('Error adding task:', error);
     }
   };
 
-  const deleteTask = async (taskId: string) => {
+  const toggleTask = (taskId: string) => {
+    setCurrentTransition(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(task =>
+        task.id === taskId ? { ...task, completed: !task.completed } : task
+      ),
+    }));
+  };
+
+  const toggleTrap = (taskId: string) => {
+    setCurrentTransition(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(task =>
+        task.id === taskId ? { ...task, isTrap: !task.isTrap } : task
+      ).sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1)),
+    }));
+  };
+
+  const archiveTransition = async (elapsedTime: number) => {
     try {
-      await deleteDoc(doc(db, 'tasks', taskId));
-      setTasks(tasks.filter(task => task.id !== taskId));
+      const completedTasks = currentTransition.tasks.filter(task => task.completed);
+      const traps = completedTasks.filter(task => task.isTrap);
+      
+      // Archive the transition
+      await addDoc(collection(db, 'archivedTransitions'), {
+        number: currentTransition.number,
+        completedTasks: completedTasks.map(task => ({
+          title: task.title,
+          isTrap: task.isTrap,
+        })),
+        elapsedTime,
+        timestamp: new Date(),
+        trapCount: traps.length,
+      });
+
+      // Create new transition
+      const newNumber = transitionCount + 1;
+      setTransitionCount(newNumber);
+      setCurrentTransition({
+        id: newNumber.toString(),
+        number: newNumber,
+        tasks: [],
+      });
     } catch (error) {
-      console.error('Error deleting task: ', error);
+      console.error('Error archiving transition:', error);
     }
   };
+
+  // Add useEffect to fetch tasks for the current transition
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const q = query(
+          collection(db, 'tasks'),
+          where('transitionNumber', '==', currentTransition.number),
+          orderBy('createdAt')
+        );
+        const querySnapshot = await getDocs(q);
+        const fetchedTasks: Task[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          fetchedTasks.push({
+            id: doc.id,
+            title: data.title,
+            completed: data.completed,
+            isTrap: data.isTrap,
+            createdAt: data.createdAt.toDate(),
+          });
+        });
+        setCurrentTransition(prev => ({
+          ...prev,
+          tasks: fetchedTasks,
+        }));
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      }
+    };
+
+    fetchTasks();
+  }, [currentTransition.number]);
 
   return (
-    <TaskContext.Provider value={{ tasks, addTask, moveTask, deleteTask }}>
+    <TaskContext.Provider value={{
+      currentTransition,
+      tasks: currentTransition.tasks,
+      addTask,
+      toggleTask,
+      toggleTrap,
+      archiveTransition,
+    }}>
       {children}
     </TaskContext.Provider>
   );

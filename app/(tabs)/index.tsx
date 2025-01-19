@@ -1,21 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, TextInput, Pressable, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useTaskContext } from '@/app/context/TaskContext';
+import { TaskList } from '../components/TaskList';
 
 export default function TransitionsScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const { addTask } = useTaskContext();
+  const { addTask, currentTransition, archiveTransition } = useTaskContext();
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (isTimerRunning) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isTimerRunning]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleFinish = async () => {
+    if (isTimerRunning) {
+      setIsTimerRunning(false);
+      await archiveTransition(elapsedTime);
+      setElapsedTime(0);
+      setNewTaskTitle('');
+    } else {
+      setIsTimerRunning(true);
+    }
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <ThemedText type="title">Current Transition</ThemedText>
-        <ThemedText type="subtitle">00:00</ThemedText>
-      </View>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.header}>
+          <ThemedText type="title">Transition {currentTransition.number}</ThemedText>
+        </View>
 
-      <View style={styles.card}>
+        <TaskList />
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -27,7 +65,7 @@ export default function TransitionsScreen() {
             style={styles.addButton}
             onPress={() => {
               if (newTaskTitle.trim()) {
-                addTask(newTaskTitle.trim(), 'today');
+                addTask(newTaskTitle.trim());
                 setNewTaskTitle('');
               }
             }}
@@ -35,28 +73,25 @@ export default function TransitionsScreen() {
             <ThemedText style={styles.buttonText}>Add</ThemedText>
           </Pressable>
         </View>
+      </ScrollView>
 
-        <View style={styles.taskList}>
-          {/* Tasks will be rendered here */}
-        </View>
-
-        <View style={styles.cardActions}>
-          <Pressable 
-            style={[styles.actionButton, !isTimerRunning ? styles.startButton : styles.stopButton]}
-            onPress={() => setIsTimerRunning(!isTimerRunning)}
-          >
-            <ThemedText style={styles.buttonText}>
-              {isTimerRunning ? 'Finish' : 'Start'}
-            </ThemedText>
-          </Pressable>
-        </View>
+      <View style={styles.footer}>
+        <ThemedText style={styles.timer}>{formatTime(elapsedTime)}</ThemedText>
+        <Pressable 
+          style={[styles.actionButton, !isTimerRunning ? styles.startButton : styles.stopButton]}
+          onPress={handleFinish}
+        >
+          <ThemedText style={styles.buttonText}>
+            {isTimerRunning ? 'Finish' : 'Start'}
+          </ThemedText>
+        </Pressable>
       </View>
 
       <View style={styles.predefinedTasks}>
         <ThemedText type="subtitle">Quick Add</ThemedText>
         {/* Predefined tasks will be rendered here */}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -65,20 +100,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  header: {
-    marginTop: 40,
-    marginBottom: 20,
-    gap: 8,
+  scrollContainer: {
+    flexGrow: 1,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  header: {
+    marginBottom: 20,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -98,20 +124,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
   },
-  buttonText: {
-    color: 'white',
+  footer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 16,
+  },
+  timer: {
+    fontSize: 24,
     fontWeight: 'bold',
   },
-  taskList: {
-    marginBottom: 16,
-  },
-  cardActions: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 16,
-  },
   actionButton: {
-    padding: 12,
+    width: '100%',
+    padding: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -120,6 +144,11 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     backgroundColor: '#f44336',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   predefinedTasks: {
     marginTop: 24,
