@@ -48,3 +48,25 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+# Number My Days
+
+## Scope
+
+- Be able to add to-dos in one of three lists.
+- The three lists are Queue, Today, and Done.
+- Tasks can be added to the Queue or Today lists.
+- Tasks can be moved between lists.
+- Tasks can be deleted or edited from any list.
+- At the end of a day, the done list becomes a "card" and is moved to another tab.
+- The cards show the date and tasks completed on that date.
+- Any task not finished in the Today list is moved to the Queue list at the end of the day (that time is set by user in settings)
+
+## Tech Stack
+- React Native
+- Expo
+- Typescript
+- Firebase
+
+## Advanced Features
+- Star feature for task priority
