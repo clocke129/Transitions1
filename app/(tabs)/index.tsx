@@ -3,6 +3,8 @@ import { View, StyleSheet, TextInput, Pressable, ScrollView } from 'react-native
 import { ThemedText } from '@/components/ThemedText';
 import { useTaskContext } from '@/app/context/TaskContext';
 import { TaskList } from '../components/TaskList';
+import { StaticTaskList } from '../components/StaticTaskList';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TransitionsScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -10,6 +12,7 @@ export default function TransitionsScreen() {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showStaticList, setShowStaticList] = useState(true);
 
   useEffect(() => {
     if (isTimerRunning) {
@@ -45,51 +48,71 @@ export default function TransitionsScreen() {
     }
   };
 
+  const handleAddFromStatic = (staticTask: { title: string }) => {
+    if (staticTask.title) {
+      addTask(staticTask.title);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <ThemedText type="title">Transition {currentTransition.number}</ThemedText>
-        </View>
-
-        <TaskList />
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={newTaskTitle}
-            onChangeText={setNewTaskTitle}
-            placeholder="Add a task to this transition..."
-          />
-          <Pressable 
-            style={styles.addButton}
-            onPress={() => {
-              if (newTaskTitle.trim()) {
-                addTask(newTaskTitle.trim());
-                setNewTaskTitle('');
-              }
-            }}
-          >
-            <ThemedText style={styles.buttonText}>Add</ThemedText>
-          </Pressable>
-        </View>
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <ThemedText style={styles.timer}>{formatTime(elapsedTime)}</ThemedText>
+      <View style={styles.content}>
         <Pressable 
-          style={[styles.actionButton, !isTimerRunning ? styles.startButton : styles.stopButton]}
-          onPress={handleFinish}
+          style={styles.toggleButton} 
+          onPress={() => setShowStaticList(!showStaticList)}
         >
-          <ThemedText style={styles.buttonText}>
-            {isTimerRunning ? 'Finish' : 'Start'}
-          </ThemedText>
+          <Ionicons 
+            name={showStaticList ? "chevron-back" : "chevron-forward"} 
+            size={24} 
+            color="#0a7ea4" 
+          />
         </Pressable>
-      </View>
 
-      <View style={styles.predefinedTasks}>
-        <ThemedText type="subtitle">Quick Add</ThemedText>
-        {/* Predefined tasks will be rendered here */}
+        {showStaticList && (
+          <StaticTaskList onAddToTransition={handleAddFromStatic} />
+        )}
+
+        <View style={styles.transitionContainer}>
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <View style={styles.header}>
+              <ThemedText type="title">Transition {currentTransition.number}</ThemedText>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={newTaskTitle}
+                onChangeText={setNewTaskTitle}
+                placeholder="Add a task to this transition..."
+              />
+              <Pressable 
+                style={styles.addButton}
+                onPress={() => {
+                  if (newTaskTitle.trim()) {
+                    addTask(newTaskTitle.trim());
+                    setNewTaskTitle('');
+                  }
+                }}
+              >
+                <ThemedText style={styles.buttonText}>Add</ThemedText>
+              </Pressable>
+            </View>
+
+            <TaskList />
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <ThemedText style={styles.timer}>{formatTime(elapsedTime)}</ThemedText>
+            <Pressable 
+              style={[styles.actionButton, !isTimerRunning ? styles.startButton : styles.stopButton]}
+              onPress={handleFinish}
+            >
+              <ThemedText style={styles.buttonText}>
+                {isTimerRunning ? 'Finish' : 'Start'}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -97,6 +120,20 @@ export default function TransitionsScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  toggleButton: {
+    padding: 8,
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  transitionContainer: {
     flex: 1,
     padding: 16,
   },
