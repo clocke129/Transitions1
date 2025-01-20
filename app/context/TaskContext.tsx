@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, writeBatch, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Task } from '../types/task';
+import { Alert } from 'react-native';
 
 interface Transition {
   id: string;
@@ -22,144 +23,175 @@ interface TaskContextType {
 export const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const [transitionCount, setTransitionCount] = useState(1);
   const [currentTransition, setCurrentTransition] = useState<Transition>({
     id: '1',
     number: 1,
     tasks: [],
   });
+  const [activeDocRef, setActiveDocRef] = useState<any>(null);
 
-  // Fetch tasks when component mounts
+  // Initialize with single document reference
   useEffect(() => {
-    const fetchTasks = async () => {
-      const querySnapshot = await getDocs(collection(db, 'tasks'));
-      const fetchedTasks: Task[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        fetchedTasks.push({
-          id: doc.id,
-          title: data.title,
-          completed: data.completed || false,
-          isTrap: data.isTrap || false,
-          createdAt: data.createdAt.toDate(),
-          completedAt: data.completedAt ? data.completedAt.toDate() : undefined,
-        });
-      });
-      setCurrentTransition(prev => ({
-        ...prev,
-        tasks: fetchedTasks,
-      }));
-    };
-
-    fetchTasks();
-  }, []);
-
-  const addTask = async (title: string) => {
-    try {
-      const newTask: Task = {
-        id: Date.now().toString(),
-        title,
-        completed: false,
-        isTrap: false,
-        createdAt: new Date(),
-      };
-
-      // Add to Firestore first
-      const docRef = await addDoc(collection(db, 'tasks'), {
-        ...newTask,
-        transitionNumber: currentTransition.number,
-      });
-
-      // Then update local state
-      setCurrentTransition(prev => ({
-        ...prev,
-        tasks: [...prev.tasks, { ...newTask, id: docRef.id }],
-      }));
-    } catch (error) {
-      console.error('Error adding task:', error);
-    }
-  };
-
-  const toggleTask = (taskId: string) => {
-    setCurrentTransition(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task =>
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      ),
-    }));
-  };
-
-  const toggleTrap = (taskId: string) => {
-    setCurrentTransition(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task =>
-        task.id === taskId ? { ...task, isTrap: !task.isTrap } : task
-      ).sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1)),
-    }));
-  };
-
-  const archiveTransition = async (elapsedTime: number) => {
-    try {
-      const completedTasks = currentTransition.tasks.filter(task => task.completed);
-      const traps = completedTasks.filter(task => task.isTrap);
-      
-      // Archive the transition
-      await addDoc(collection(db, 'archivedTransitions'), {
-        number: currentTransition.number,
-        completedTasks: completedTasks.map(task => ({
-          title: task.title,
-          isTrap: task.isTrap,
-        })),
-        elapsedTime,
-        timestamp: new Date(),
-        trapCount: traps.length,
-      });
-
-      // Create new transition
-      const newNumber = transitionCount + 1;
-      setTransitionCount(newNumber);
-      setCurrentTransition({
-        id: newNumber.toString(),
-        number: newNumber,
-        tasks: [],
-      });
-    } catch (error) {
-      console.error('Error archiving transition:', error);
-    }
-  };
-
-  // Add useEffect to fetch tasks for the current transition
-  useEffect(() => {
-    const fetchTasks = async () => {
+    const initializeActiveTransition = async () => {
       try {
-        const q = query(
-          collection(db, 'tasks'),
-          where('transitionNumber', '==', currentTransition.number),
-          orderBy('createdAt')
-        );
-        const querySnapshot = await getDocs(q);
-        const fetchedTasks: Task[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          fetchedTasks.push({
-            id: doc.id,
-            title: data.title,
-            completed: data.completed,
-            isTrap: data.isTrap,
-            createdAt: data.createdAt.toDate(),
+        const activeRef = collection(db, 'activeTransition');
+        const snapshot = await getDocs(activeRef);
+        
+        if (snapshot.empty) {
+          // Create initial active transition
+          const newDoc = await addDoc(activeRef, {
+            number: 1,
+            tasks: [],
+            startTime: new Date(),
           });
-        });
-        setCurrentTransition(prev => ({
-          ...prev,
-          tasks: fetchedTasks,
-        }));
+          setActiveDocRef(newDoc);
+          setCurrentTransition({
+            id: newDoc.id,
+            number: 1,
+            tasks: [],
+            startTime: new Date(),
+          });
+        } else {
+          // Load existing active transition
+          const doc = snapshot.docs[0];
+          setActiveDocRef(doc.ref);
+          const data = doc.data();
+          setCurrentTransition({
+            id: doc.id,
+            number: data.number,
+            tasks: data.tasks || [],
+            startTime: data.startTime?.toDate(),
+          });
+        }
       } catch (error) {
-        console.error('Error fetching tasks:', error);
+        console.error('Error initializing active transition:', error);
       }
     };
 
-    fetchTasks();
-  }, [currentTransition.number]);
+    initializeActiveTransition();
+  }, []);
+
+  const addTask = async (title: string, isTrap: boolean = false) => {
+    if (!activeDocRef) return;
+
+    try {
+      const newTask = {
+        id: Date.now().toString(),
+        title,
+        completed: false,
+        isTrap,
+        createdAt: new Date(),
+      };
+
+      const updatedTasks = [...currentTransition.tasks, newTask]
+        .sort((a, b) => a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1);
+
+      // Single update operation
+      await updateDoc(activeDocRef, {
+        tasks: updatedTasks
+      });
+
+      setCurrentTransition(prev => ({
+        ...prev,
+        tasks: updatedTasks,
+      }));
+    } catch (error) {
+      console.error('Error adding task:', error);
+      Alert.alert('Error', 'Failed to add task');
+    }
+  };
+
+  const toggleTask = async (taskId: string) => {
+    if (!activeDocRef) return;
+
+    try {
+      const updatedTasks = currentTransition.tasks.map(task => 
+        task.id === taskId 
+          ? { ...task, completed: !task.completed, completedAt: !task.completed ? new Date() : undefined }
+          : task
+      );
+
+      await updateDoc(activeDocRef, {
+        tasks: updatedTasks
+      });
+
+      setCurrentTransition(prev => ({
+        ...prev,
+        tasks: updatedTasks,
+      }));
+    } catch (error) {
+      console.error('Error toggling task:', error);
+      Alert.alert('Error', 'Failed to update task');
+    }
+  };
+
+  const toggleTrap = async (taskId: string) => {
+    if (!activeDocRef) return;
+
+    try {
+      const updatedTasks = currentTransition.tasks.map(task => 
+        task.id === taskId 
+          ? { ...task, isTrap: !task.isTrap }
+          : task
+      ).sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1));
+
+      await updateDoc(activeDocRef, {
+        tasks: updatedTasks
+      });
+
+      setCurrentTransition(prev => ({
+        ...prev,
+        tasks: updatedTasks,
+      }));
+    } catch (error) {
+      console.error('Error toggling trap:', error);
+      Alert.alert('Error', 'Failed to update task');
+    }
+  };
+
+  const archiveTransition = async (elapsedTime: number) => {
+    if (!activeDocRef) {
+      console.error('No active document reference');
+      return;
+    }
+
+    try {
+      // 1. Archive current transition
+      const archiveData = {
+        number: currentTransition.number,
+        tasks: currentTransition.tasks,
+        elapsedTime,
+        completedAt: new Date(),
+        startTime: currentTransition.startTime,
+      };
+
+      // Simple addDoc to archivedTransitions
+      const archivedTransitionsRef = collection(db, 'archivedTransitions');
+      const archiveDoc = await addDoc(archivedTransitionsRef, archiveData);
+      console.log('Archived transition with ID:', archiveDoc.id);
+
+      // 2. Create new transition
+      const newNumber = currentTransition.number + 1;
+      const newTransition = {
+        number: newNumber,
+        tasks: [],
+        startTime: new Date(),
+      };
+
+      // 3. Update active transition
+      await updateDoc(activeDocRef, newTransition);
+
+      // 4. Update local state
+      setCurrentTransition({
+        id: activeDocRef.id,
+        ...newTransition,
+      });
+
+    } catch (error) {
+      console.error('Error archiving transition:', error);
+      Alert.alert('Error', 'Failed to archive transition');
+    }
+  };
 
   return (
     <TaskContext.Provider value={{
