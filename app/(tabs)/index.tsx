@@ -71,7 +71,10 @@ export default function TransitionsScreen() {
         </Pressable>
 
         {showStaticList && (
-          <StaticTaskList onAddToTransition={handleAddFromStatic} />
+          <StaticTaskList 
+            onAddToTransition={handleAddFromStatic}
+            currentTransition={currentTransition}
+          />
         )}
 
         <View style={styles.transitionContainer}>
@@ -95,7 +98,7 @@ export default function TransitionsScreen() {
                   <Pressable 
                     style={styles.titleContainer} 
                     onPress={() => {
-                      setEditTitle(currentTransition.title);
+                      setEditTitle(currentTransition.title || `Transition ${currentTransition.number}`);
                       setIsEditingTitle(true);
                     }}
                   >

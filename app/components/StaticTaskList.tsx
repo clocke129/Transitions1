@@ -4,6 +4,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { Task } from '@/app/context/TaskContext';
+import { Transition } from '../context/TransitionContext';
 
 interface StaticTask {
   id: string;
@@ -11,17 +13,27 @@ interface StaticTask {
   isTrap: boolean;
 }
 
-interface Props {
-  onAddToTransition: (task: StaticTask) => void;
+interface Template {
+  id: string;
+  title: string;
+  tasks: Task[];
+  createdAt: Date;
 }
 
-export function StaticTaskList({ onAddToTransition }: Props) {
+interface Props {
+  onAddToTransition: (task: StaticTask) => void;
+  currentTransition: Transition;
+}
+
+export function StaticTaskList({ onAddToTransition, currentTransition }: Props) {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [staticTasks, setStaticTasks] = useState<StaticTask[]>([]);
   const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
     fetchStaticTasks();
+    fetchTemplates();
   }, []);
 
   const fetchStaticTasks = async () => {
@@ -35,6 +47,20 @@ export function StaticTaskList({ onAddToTransition }: Props) {
       setStaticTasks(tasks.sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1)));
     } catch (error) {
       console.error('Error fetching static tasks:', error);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const q = query(collection(db, 'staticTemplates'));
+      const querySnapshot = await getDocs(q);
+      const loadedTemplates: Template[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedTemplates.push({ id: doc.id, ...doc.data() } as Template);
+      });
+      setTemplates(loadedTemplates);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
     }
   };
 
@@ -99,6 +125,30 @@ export function StaticTaskList({ onAddToTransition }: Props) {
       setEditingTask(null);
     } catch (error) {
       console.error('Error editing task:', error);
+    }
+  };
+
+  const addTemplate = async () => {
+    try {
+      const templateData = {
+        title: currentTransition.title || `Transition ${currentTransition.number}`,
+        tasks: currentTransition.tasks.map(task => ({
+          id: task.id,
+          title: task.title,
+          completed: task.completed,
+          isTrap: task.isTrap
+        })),
+        createdAt: new Date()  // Let Firestore handle the timestamp conversion
+      };
+      
+      console.log('Template data:', templateData);
+      const docRef = await addDoc(collection(db, 'staticTemplates'), templateData);
+      console.log('Template added with ID: ', docRef.id);
+      
+      Alert.alert('Success', 'Template saved successfully!');
+    } catch (error) {
+      console.error('Error adding template:', error);
+      Alert.alert('Error', 'Failed to save template');
     }
   };
 
@@ -173,6 +223,20 @@ export function StaticTaskList({ onAddToTransition }: Props) {
           </View>
         </View>
       ))}
+
+      {/* Templates Section */}
+      <View style={styles.templatesSection}>
+        <ThemedText style={styles.title}>Templates</ThemedText>
+        <Pressable 
+          style={styles.addTemplateButton}
+          onPress={() => {
+            console.log('Button pressed'); // Debug log
+            addTemplate();
+          }}
+        >
+          <ThemedText style={styles.buttonText}>Add Template</ThemedText>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -241,5 +305,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 4,
     marginRight: 8,
+  },
+  templatesSection: {
+    marginTop: 32,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 16,
+  },
+  addTemplateButton: {
+    backgroundColor: '#0a7ea4',
+    padding: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
   },
 });

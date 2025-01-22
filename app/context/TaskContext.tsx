@@ -3,17 +3,17 @@ import { Alert } from 'react-native';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
-interface Task {
+export interface Task {
   id: string;
   title: string;
   completed: boolean;
   isTrap: boolean;
-  createdAt: Date;
 }
 
 interface Transition {
   id: string;
   number: number;
+  title?: string;
   tasks: Task[];
   startTime?: Date;
 }
@@ -34,8 +34,9 @@ const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [currentTransition, setCurrentTransition] = useState<Transition>({
-    id: '1',
+    id: Date.now().toString(),
     number: 1,
+    title: 'Transition 1',
     tasks: [],
     startTime: new Date()
   });
@@ -52,6 +53,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           const initialTransition = {
             id: Date.now().toString(),
             number: 1,
+            title: 'Transition 1',
             tasks: [],
             startTime: new Date()
           };
@@ -81,7 +83,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       title,
       completed: false,
       isTrap: false,
-      createdAt: new Date()
     };
 
     const updatedTransition = {
