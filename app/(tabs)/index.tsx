@@ -50,9 +50,9 @@ export default function TransitionsScreen() {
     }
   };
 
-  const handleAddFromStatic = (staticTask: { title: string }) => {
+  const handleAddFromStatic = (staticTask: { title: string; isTrap: boolean }) => {
     if (staticTask.title) {
-      addTask(staticTask.title);
+      addTask(staticTask.title, staticTask.isTrap);
     }
   };
 

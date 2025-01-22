@@ -21,7 +21,7 @@ interface Transition {
 interface TaskContextType {
   currentTransition: Transition;
   tasks: Task[];
-  addTask: (title: string) => void;
+  addTask: (title: string, isTrap: boolean) => void;
   toggleTask: (taskId: string) => void;
   toggleTrap: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
@@ -77,21 +77,18 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addTask = async (title: string) => {
+  const addTask = async (title: string, isTrap: boolean = false) => {
     const newTask: Task = {
       id: Date.now().toString(),
       title,
       completed: false,
-      isTrap: false,
+      isTrap: isTrap
     };
-
-    const updatedTransition = {
-      ...currentTransition,
-      tasks: [...currentTransition.tasks, newTask]
-    };
-
-    setCurrentTransition(updatedTransition);
-    await updateFirebaseTransition(updatedTransition);
+    setCurrentTransition(prev => ({
+      ...prev,
+      tasks: [...prev.tasks, newTask]
+    }));
+    await updateFirebaseTransition(currentTransition);
   };
 
   const toggleTask = async (taskId: string) => {

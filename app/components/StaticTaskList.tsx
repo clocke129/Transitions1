@@ -152,6 +152,16 @@ export function StaticTaskList({ onAddToTransition, currentTransition }: Props) 
     }
   };
 
+  const useTemplate = (template: Template) => {
+    template.tasks.forEach(task => {
+      onAddToTransition({ 
+        id: task.id,
+        title: task.title,
+        isTrap: task.isTrap 
+      });
+    });
+  };
+
   return (
     <View style={styles.container}>
       <ThemedText style={styles.title}>Quick Add</ThemedText>
@@ -229,13 +239,22 @@ export function StaticTaskList({ onAddToTransition, currentTransition }: Props) 
         <ThemedText style={styles.title}>Templates</ThemedText>
         <Pressable 
           style={styles.addTemplateButton}
-          onPress={() => {
-            console.log('Button pressed'); // Debug log
-            addTemplate();
-          }}
+          onPress={addTemplate}
         >
           <ThemedText style={styles.buttonText}>Add Template</ThemedText>
         </Pressable>
+
+        {templates.map((template) => (
+          <View key={template.id} style={styles.templateRow}>
+            <ThemedText style={styles.templateTitle}>{template.title}</ThemedText>
+            <Pressable 
+              style={styles.iconButton}
+              onPress={() => useTemplate(template)}
+            >
+              <Ionicons name="add-circle" size={24} color="#0a7ea4" />
+            </Pressable>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -318,5 +337,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 8,
+  },
+  templateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  templateTitle: {
+    fontSize: 14,
+    flex: 1,
   },
 });
