@@ -27,6 +27,7 @@ interface TaskContextType {
   deleteTask: (taskId: string) => void;
   editTask: (taskId: string, newTitle: string) => void;
   archiveTransition: (elapsedTime: number) => Promise<void>;
+  updateTransitionTitle: (newTitle: string) => Promise<void>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
@@ -168,6 +169,20 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateTransitionTitle = async (newTitle: string) => {
+    try {
+      const updatedTransition = {
+        ...currentTransition,
+        title: newTitle || `Transition ${currentTransition.number}`
+      };
+      
+      setCurrentTransition(updatedTransition);
+      await updateFirebaseTransition(updatedTransition);
+    } catch (error) {
+      console.error('Error updating transition title:', error);
+    }
+  };
+
   return (
     <TaskContext.Provider value={{ 
       currentTransition, 
@@ -177,7 +192,8 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       toggleTrap,
       deleteTask,
       editTask,
-      archiveTransition
+      archiveTransition,
+      updateTransitionTitle
     }}>
       {children}
     </TaskContext.Provider>

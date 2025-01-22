@@ -8,11 +8,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function TransitionsScreen() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const { addTask, currentTransition, archiveTransition } = useTaskContext();
+  const { addTask, currentTransition, archiveTransition, updateTransitionTitle } = useTaskContext();
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [showStaticList, setShowStaticList] = useState(true);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
 
   useEffect(() => {
     if (isTimerRunning) {
@@ -75,7 +77,33 @@ export default function TransitionsScreen() {
         <View style={styles.transitionContainer}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.header}>
-              <ThemedText type="title">Transition {currentTransition.number}</ThemedText>
+              <View style={styles.titleContainer}>
+                {isEditingTitle ? (
+                  <View style={styles.titleEditContainer}>
+                    <TextInput
+                      style={styles.titleInput}
+                      value={editTitle}
+                      onChangeText={setEditTitle}
+                      onBlur={() => {
+                        updateTransitionTitle(editTitle);
+                        setIsEditingTitle(false);
+                      }}
+                      autoFocus
+                    />
+                  </View>
+                ) : (
+                  <Pressable 
+                    style={styles.titleContainer} 
+                    onPress={() => {
+                      setEditTitle(currentTransition.title);
+                      setIsEditingTitle(true);
+                    }}
+                  >
+                    <ThemedText type="title">{currentTransition.title || `Transition ${currentTransition.number}`}</ThemedText>
+                    <Ionicons name="pencil-outline" size={20} color="#666" />
+                  </Pressable>
+                )}
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
@@ -189,5 +217,26 @@ const styles = StyleSheet.create({
   },
   predefinedTasks: {
     marginTop: 24,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  titleEditContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titleInput: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    minWidth: 200,
+    backgroundColor: '#fff',
   },
 });
