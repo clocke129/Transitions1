@@ -1,8 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, writeBatch, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/config/firebase';
-import { Task } from '../types/task';
 import { Alert } from 'react-native';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+
+interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+  isTrap: boolean;
+  createdAt: Date;
+}
 
 interface Transition {
   id: string;
@@ -17,176 +24,144 @@ interface TaskContextType {
   addTask: (title: string) => void;
   toggleTask: (taskId: string) => void;
   toggleTrap: (taskId: string) => void;
+  deleteTask: (taskId: string) => void;
+  editTask: (taskId: string, newTitle: string) => void;
   archiveTransition: (elapsedTime: number) => Promise<void>;
 }
 
-export const TaskContext = createContext<TaskContextType | undefined>(undefined);
+const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [currentTransition, setCurrentTransition] = useState<Transition>({
     id: '1',
     number: 1,
     tasks: [],
+    startTime: new Date()
   });
-  const [activeDocRef, setActiveDocRef] = useState<any>(null);
 
-  // Initialize with single document reference
   useEffect(() => {
-    const initializeActiveTransition = async () => {
+    const fetchCurrentTransition = async () => {
       try {
-        const activeRef = collection(db, 'activeTransition');
-        const snapshot = await getDocs(activeRef);
+        const transitionRef = doc(db, 'activeTransition', 'current');
+        const transitionDoc = await getDoc(transitionRef);
         
-        if (snapshot.empty) {
-          // Create initial active transition
-          const newDoc = await addDoc(activeRef, {
-            number: 1,
-            tasks: [],
-            startTime: new Date(),
-          });
-          setActiveDocRef(newDoc);
-          setCurrentTransition({
-            id: newDoc.id,
-            number: 1,
-            tasks: [],
-            startTime: new Date(),
-          });
+        if (transitionDoc.exists()) {
+          setCurrentTransition(transitionDoc.data() as Transition);
         } else {
-          // Load existing active transition
-          const doc = snapshot.docs[0];
-          setActiveDocRef(doc.ref);
-          const data = doc.data();
-          setCurrentTransition({
-            id: doc.id,
-            number: data.number,
-            tasks: data.tasks || [],
-            startTime: data.startTime?.toDate(),
-          });
+          const initialTransition = {
+            id: Date.now().toString(),
+            number: 1,
+            tasks: [],
+            startTime: new Date()
+          };
+          await setDoc(transitionRef, initialTransition);
+          setCurrentTransition(initialTransition);
         }
       } catch (error) {
-        console.error('Error initializing active transition:', error);
+        console.error('Error fetching current transition:', error);
       }
     };
 
-    initializeActiveTransition();
+    fetchCurrentTransition();
   }, []);
 
-  const addTask = async (title: string, isTrap: boolean = false) => {
-    if (!activeDocRef) return;
-
+  const updateFirebaseTransition = async (transition: Transition) => {
     try {
-      const newTask = {
-        id: Date.now().toString(),
-        title,
-        completed: false,
-        isTrap,
-        createdAt: new Date(),
-      };
-
-      const updatedTasks = [...currentTransition.tasks, newTask]
-        .sort((a, b) => a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1);
-
-      // Single update operation
-      await updateDoc(activeDocRef, {
-        tasks: updatedTasks
-      });
-
-      setCurrentTransition(prev => ({
-        ...prev,
-        tasks: updatedTasks,
-      }));
+      const transitionRef = doc(db, 'activeTransition', 'current');
+      await setDoc(transitionRef, transition);
     } catch (error) {
-      console.error('Error adding task:', error);
-      Alert.alert('Error', 'Failed to add task');
+      console.error('Error updating transition in Firebase:', error);
     }
+  };
+
+  const addTask = async (title: string) => {
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title,
+      completed: false,
+      isTrap: false,
+      createdAt: new Date()
+    };
+
+    const updatedTransition = {
+      ...currentTransition,
+      tasks: [...currentTransition.tasks, newTask]
+    };
+
+    setCurrentTransition(updatedTransition);
+    await updateFirebaseTransition(updatedTransition);
   };
 
   const toggleTask = async (taskId: string) => {
-    if (!activeDocRef) return;
+    const updatedTransition = {
+      ...currentTransition,
+      tasks: currentTransition.tasks.map(task =>
+        task.id === taskId ? { ...task, completed: !task.completed } : task
+      )
+    };
 
-    try {
-      const updatedTasks = currentTransition.tasks.map(task => 
-        task.id === taskId 
-          ? { ...task, completed: !task.completed, completedAt: !task.completed ? new Date() : undefined }
-          : task
-      );
-
-      await updateDoc(activeDocRef, {
-        tasks: updatedTasks
-      });
-
-      setCurrentTransition(prev => ({
-        ...prev,
-        tasks: updatedTasks,
-      }));
-    } catch (error) {
-      console.error('Error toggling task:', error);
-      Alert.alert('Error', 'Failed to update task');
-    }
+    setCurrentTransition(updatedTransition);
+    await updateFirebaseTransition(updatedTransition);
   };
 
   const toggleTrap = async (taskId: string) => {
-    if (!activeDocRef) return;
+    const updatedTransition = {
+      ...currentTransition,
+      tasks: currentTransition.tasks.map(task =>
+        task.id === taskId ? { ...task, isTrap: !task.isTrap } : task
+      )
+    };
 
-    try {
-      const updatedTasks = currentTransition.tasks.map(task => 
-        task.id === taskId 
-          ? { ...task, isTrap: !task.isTrap }
-          : task
-      ).sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1));
+    setCurrentTransition(updatedTransition);
+    await updateFirebaseTransition(updatedTransition);
+  };
 
-      await updateDoc(activeDocRef, {
-        tasks: updatedTasks
-      });
+  const deleteTask = async (taskId: string) => {
+    const updatedTransition = {
+      ...currentTransition,
+      tasks: currentTransition.tasks.filter(task => task.id !== taskId)
+    };
 
-      setCurrentTransition(prev => ({
-        ...prev,
-        tasks: updatedTasks,
-      }));
-    } catch (error) {
-      console.error('Error toggling trap:', error);
-      Alert.alert('Error', 'Failed to update task');
-    }
+    setCurrentTransition(updatedTransition);
+    await updateFirebaseTransition(updatedTransition);
+  };
+
+  const editTask = async (taskId: string, newTitle: string) => {
+    const updatedTransition = {
+      ...currentTransition,
+      tasks: currentTransition.tasks.map(task =>
+        task.id === taskId ? { ...task, title: newTitle } : task
+      )
+    };
+
+    setCurrentTransition(updatedTransition);
+    await updateFirebaseTransition(updatedTransition);
   };
 
   const archiveTransition = async (elapsedTime: number) => {
-    if (!activeDocRef) {
-      console.error('No active document reference');
-      return;
-    }
-
     try {
-      // 1. Archive current transition
       const archiveData = {
+        id: currentTransition.id,
         number: currentTransition.number,
         tasks: currentTransition.tasks,
-        elapsedTime,
-        completedAt: new Date(),
         startTime: currentTransition.startTime,
+        completedAt: new Date(),
+        elapsedTime
       };
-
-      // Simple addDoc to archivedTransitions
-      const archivedTransitionsRef = collection(db, 'archivedTransitions');
-      const archiveDoc = await addDoc(archivedTransitionsRef, archiveData);
-      console.log('Archived transition with ID:', archiveDoc.id);
-
-      // 2. Create new transition
-      const newNumber = currentTransition.number + 1;
+      
+      await addDoc(collection(db, 'archivedTransitions'), archiveData);
+      
       const newTransition = {
-        number: newNumber,
+        id: Date.now().toString(),
+        number: currentTransition.number + 1,
         tasks: [],
-        startTime: new Date(),
+        startTime: new Date()
       };
 
-      // 3. Update active transition
-      await updateDoc(activeDocRef, newTransition);
-
-      // 4. Update local state
-      setCurrentTransition({
-        id: activeDocRef.id,
-        ...newTransition,
-      });
-
+      const activeTransitionRef = doc(db, 'activeTransition', 'current');
+      await setDoc(activeTransitionRef, newTransition);
+      
+      setCurrentTransition(newTransition);
     } catch (error) {
       console.error('Error archiving transition:', error);
       Alert.alert('Error', 'Failed to archive transition');
@@ -194,13 +169,15 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <TaskContext.Provider value={{
-      currentTransition,
+    <TaskContext.Provider value={{ 
+      currentTransition, 
       tasks: currentTransition.tasks,
-      addTask,
-      toggleTask,
+      addTask, 
+      toggleTask, 
       toggleTrap,
-      archiveTransition,
+      deleteTask,
+      editTask,
+      archiveTransition
     }}>
       {children}
     </TaskContext.Provider>
