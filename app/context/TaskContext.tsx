@@ -79,7 +79,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   const addTask = async (title: string, isTrap: boolean = false) => {
     const newTask: Task = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title,
       completed: false,
       isTrap: isTrap

@@ -74,6 +74,7 @@ export default function TransitionsScreen() {
           <StaticTaskList 
             onAddToTransition={handleAddFromStatic}
             currentTransition={currentTransition}
+            updateTransitionTitle={updateTransitionTitle}
           />
         )}
 

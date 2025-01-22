@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Task } from '@/app/context/TaskContext';
 import { Transition } from '../context/TransitionContext';
@@ -23,9 +23,10 @@ interface Template {
 interface Props {
   onAddToTransition: (task: StaticTask) => void;
   currentTransition: Transition;
+  updateTransitionTitle: (title: string) => Promise<void>;
 }
 
-export function StaticTaskList({ onAddToTransition, currentTransition }: Props) {
+export function StaticTaskList({ onAddToTransition, currentTransition, updateTransitionTitle }: Props) {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [staticTasks, setStaticTasks] = useState<StaticTask[]>([]);
   const [editingTask, setEditingTask] = useState<string | null>(null);
@@ -33,7 +34,26 @@ export function StaticTaskList({ onAddToTransition, currentTransition }: Props) 
 
   useEffect(() => {
     fetchStaticTasks();
-    fetchTemplates();
+  }, []);
+
+  useEffect(() => {
+    const templatesRef = collection(db, 'staticTemplates');
+    const q = query(templatesRef, orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedTemplates: Template[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        loadedTemplates.push({ 
+          id: doc.id, 
+          ...data,
+          createdAt: data.createdAt?.toDate()
+        } as Template);
+      });
+      setTemplates(loadedTemplates);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const fetchStaticTasks = async () => {
@@ -47,20 +67,6 @@ export function StaticTaskList({ onAddToTransition, currentTransition }: Props) 
       setStaticTasks(tasks.sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1)));
     } catch (error) {
       console.error('Error fetching static tasks:', error);
-    }
-  };
-
-  const fetchTemplates = async () => {
-    try {
-      const q = query(collection(db, 'staticTemplates'));
-      const querySnapshot = await getDocs(q);
-      const loadedTemplates: Template[] = [];
-      querySnapshot.forEach((doc) => {
-        loadedTemplates.push({ id: doc.id, ...doc.data() } as Template);
-      });
-      setTemplates(loadedTemplates);
-    } catch (error) {
-      console.error('Error fetching templates:', error);
     }
   };
 
@@ -152,14 +158,24 @@ export function StaticTaskList({ onAddToTransition, currentTransition }: Props) 
     }
   };
 
-  const useTemplate = (template: Template) => {
-    template.tasks.forEach(task => {
-      onAddToTransition({ 
-        id: task.id,
-        title: task.title,
-        isTrap: task.isTrap 
+  const useTemplate = async (template: Template) => {
+    console.log('Using template:', template.title);
+    try {
+      // Update the title first
+      await updateTransitionTitle(template.title);
+      console.log('Title updated to:', template.title);
+      
+      // Then add all tasks with UUID
+      template.tasks.forEach(task => {
+        onAddToTransition({ 
+          id: crypto.randomUUID(),
+          title: task.title,
+          isTrap: task.isTrap 
+        });
       });
-    });
+    } catch (error) {
+      console.error('Error using template:', error);
+    }
   };
 
   return (
