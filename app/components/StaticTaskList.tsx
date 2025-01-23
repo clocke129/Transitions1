@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Task } from '@/app/context/TaskContext';
-import { Transition } from '../context/TransitionContext';
+import { Transition } from '@/app/context/TransitionContext';
 
 interface StaticTask {
   id: string;
@@ -27,9 +27,11 @@ interface Props {
 }
 
 export function StaticTaskList({ onAddToTransition, currentTransition, updateTransitionTitle }: Props) {
-  const [newTaskTitle, setNewTaskTitle] = useState('');
   const [staticTasks, setStaticTasks] = useState<StaticTask[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
   const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [menuTask, setMenuTask] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>('');
   const [templates, setTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
@@ -138,7 +140,7 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
     try {
       const templateData = {
         title: currentTransition.title || `Transition ${currentTransition.number}`,
-        tasks: currentTransition.tasks.map(task => ({
+        tasks: currentTransition.tasks.map((task: Task) => ({
           id: task.id,
           title: task.title,
           completed: task.completed,
@@ -178,19 +180,28 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
     }
   };
 
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setMenuTask(null);
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   return (
     <View style={styles.container}>
       <ThemedText style={styles.title}>Quick Add</ThemedText>
       
-      <View style={styles.inputContainer}>
+      <View style={styles.addContainer}>
         <TextInput
           style={styles.input}
           value={newTaskTitle}
           onChangeText={setNewTaskTitle}
           placeholder="Add to quick list..."
+          onSubmitEditing={addStaticTask}
         />
         <Pressable style={styles.addButton} onPress={addStaticTask}>
-          <ThemedText style={styles.buttonText}>Add</ThemedText>
+          <ThemedText style={styles.addButtonText}>Add</ThemedText>
         </Pressable>
       </View>
 
@@ -199,54 +210,77 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
           {editingTask === task.id ? (
             <TextInput
               style={styles.editInput}
-              value={task.title}
-              onChangeText={(newTitle) => {
-                setStaticTasks(prev =>
-                  prev.map(t => t.id === task.id ? { ...t, title: newTitle } : t)
-                );
+              value={editingTitle}
+              onChangeText={setEditingTitle}
+              onBlur={() => {
+                editTask(task.id, editingTitle);
+                setEditingTask(null);
               }}
-              onBlur={() => editTask(task.id, task.title)}
               autoFocus
             />
           ) : (
-            <ThemedText style={styles.taskText}>{task.title}</ThemedText>
+            <Pressable 
+              style={styles.taskContent}
+              onPress={(e) => {
+                e.stopPropagation();
+                setMenuTask(task.id);
+              }}
+            >
+              <ThemedText style={styles.taskText}>{task.title}</ThemedText>
+              <View style={styles.actionButtons}>
+                <Pressable
+                  style={[
+                    styles.addToTransitionButton,
+                    task.isTrap && styles.trapAddButton
+                  ]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onAddToTransition(task);
+                  }}>
+                  <Ionicons 
+                    name="add-circle" 
+                    size={24} 
+                    color={task.isTrap ? "#ff4444" : "#0a7ea4"} 
+                  />
+                </Pressable>
+              </View>
+            </Pressable>
           )}
-          
-          <View style={styles.actionButtons}>
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => toggleTrap(task.id)}>
-              <Ionicons 
-                name="skull-outline" 
-                size={20} 
-                color={task.isTrap ? '#000' : '#ccc'} 
-              />
-            </Pressable>
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => setEditingTask(task.id)}>
-              <Ionicons name="pencil" size={20} color="#666" />
-            </Pressable>
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => {
-                Alert.alert(
-                  'Delete Task',
-                  'Are you sure you want to delete this task?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', onPress: () => deleteTask(task.id), style: 'destructive' }
-                  ]
-                );
-              }}>
-              <Ionicons name="trash" size={20} color="#ff4444" />
-            </Pressable>
-            <Pressable
-              style={styles.addToTransitionButton}
-              onPress={() => onAddToTransition(task)}>
-              <Ionicons name="add-circle" size={24} color="#0a7ea4" />
-            </Pressable>
-          </View>
+
+          {menuTask === task.id && (
+            <View style={styles.menuOverlay}>
+              <View style={styles.menu}>
+                <Pressable 
+                  style={styles.menuItem}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setEditingTitle(task.title);
+                    setEditingTask(task.id);
+                    setMenuTask(null);
+                  }}>
+                  <ThemedText>Rename</ThemedText>
+                </Pressable>
+                <Pressable 
+                  style={styles.menuItem}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    deleteTask(task.id);
+                    setMenuTask(null);
+                  }}>
+                  <ThemedText style={styles.deleteText}>Delete</ThemedText>
+                </Pressable>
+                <Pressable 
+                  style={styles.menuItem}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    toggleTrap(task.id);
+                    setMenuTask(null);
+                  }}>
+                  <ThemedText>Convert to {task.isTrap ? 'Normal' : 'Trap'}</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       ))}
 
@@ -289,7 +323,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
   },
-  inputContainer: {
+  addContainer: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
@@ -307,7 +341,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
   },
-  buttonText: {
+  addButtonText: {
     color: 'white',
   },
   taskItem: {
@@ -322,16 +356,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
-  addToTransitionButton: {
-    padding: 4,
+  taskContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginLeft: 'auto',
   },
-  iconButton: {
-    padding: 4,
+  addToTransitionButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  trapAddButton: {
+    // Additional styles if needed
   },
   editInput: {
     flex: 1,
@@ -354,6 +394,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  buttonText: {
+    color: 'white',
+  },
   templateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -365,5 +408,32 @@ const styles = StyleSheet.create({
   templateTitle: {
     fontSize: 14,
     flex: 1,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menu: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 8,
+    minWidth: 150,
+  },
+  menuItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  deleteText: {
+    color: '#ff4444',
+  },
+  menuItemLast: {
+    borderBottomWidth: 0, // Remove the last border
   },
 });
