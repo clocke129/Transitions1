@@ -221,9 +221,6 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
       {staticTasks.map((task) => (
         <View key={task.id} style={styles.taskItem}>
           <View style={styles.taskContent}>
-            <ThemedText style={[styles.taskText, task.isTrap && styles.trapText]}>
-              {task.title}
-            </ThemedText>
             <View style={styles.actionButtons}>
               <Pressable
                 onPress={(e) => {
@@ -232,18 +229,25 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
                 }}
                 style={styles.addToTransitionButton}
               >
-                <Ionicons name="add-circle-outline" size={24} color="#0a7ea4" />
-              </Pressable>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setMenuTask(task.id);
-                }}
-                style={styles.menuButton}
-              >
-                <Ionicons name="ellipsis-vertical" size={24} color="#666" />
+                <Ionicons 
+                  name={task.isTrap ? "remove-circle-outline" : "add-circle-outline"} 
+                  size={24} 
+                  color="#0a7ea4" 
+                />
               </Pressable>
             </View>
+            <ThemedText style={styles.taskText}>
+              {task.title}
+            </ThemedText>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                setMenuTask(task.id);
+              }}
+              style={styles.menuButton}
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+            </Pressable>
           </View>
           {menuTask === task.id && (
             <Pressable
@@ -292,13 +296,19 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
 
         {templates.map((template) => (
           <View key={template.id} style={styles.templateRow}>
-            <ThemedText style={styles.templateTitle}>{template.title}</ThemedText>
-            <Pressable 
-              style={styles.iconButton}
-              onPress={() => useTemplate(template)}
-            >
-              <Ionicons name="add-circle" size={24} color="#0a7ea4" />
-            </Pressable>
+            <View style={styles.taskContent}>
+              <View style={styles.actionButtons}>
+                <Pressable 
+                  style={styles.addToTransitionButton}
+                  onPress={() => useTemplate(template)}
+                >
+                  <Ionicons name="add-circle-outline" size={24} color="#0a7ea4" />
+                </Pressable>
+              </View>
+              <ThemedText style={styles.taskText}>
+                {template.title}
+              </ThemedText>
+            </View>
           </View>
         ))}
       </View>
@@ -341,10 +351,8 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   taskItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 8,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -355,16 +363,15 @@ const styles = StyleSheet.create({
   taskContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
+    gap: 8,
   },
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 'auto',
   },
   addToTransitionButton: {
     padding: 8,
-    marginLeft: 8,
   },
   trapAddButton: {
     // Additional styles if needed
@@ -439,6 +446,6 @@ const styles = StyleSheet.create({
     // Additional styles if needed
   },
   menuButton: {
-    // Additional styles if needed
+    padding: 8,
   },
 });

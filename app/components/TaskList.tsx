@@ -51,13 +51,21 @@ export function TaskList() {
               }}
             >
               {task.completed ? (
-                <Ionicons name="checkmark-circle" size={24} color="#0a7ea4" />
+                <Ionicons 
+                  name={task.isTrap ? "remove-circle" : "checkmark-circle"} 
+                  size={24} 
+                  color={task.isTrap ? "#ff4444" : "#0a7ea4"} 
+                />
               ) : (
-                <Ionicons name="ellipse-outline" size={24} color="#666" />
+                <Ionicons 
+                  name={task.isTrap ? "remove-circle-outline" : "ellipse-outline"} 
+                  size={24} 
+                  color="#666" 
+                />
               )}
             </Pressable>
             <View style={styles.taskTextContainer}>
-              <ThemedText style={[styles.taskText, task.isTrap && styles.trapText]}>
+              <ThemedText style={styles.taskText}>
                 {task.title}
               </ThemedText>
               <Pressable
@@ -142,6 +150,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 8,
   },
   taskTextContainer: {
     flexDirection: 'row',
@@ -156,7 +165,7 @@ const styles = StyleSheet.create({
     color: '#ff4444',
   },
   menuButton: {
-    padding: 4,
+    padding: 8,
   },
   menuOverlay: {
     position: 'absolute',
@@ -191,6 +200,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   checkbox: {
-    marginRight: 12,
+    marginRight: 8,
   },
 }); 
