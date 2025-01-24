@@ -48,7 +48,19 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const transitionDoc = await getDoc(transitionRef);
         
         if (transitionDoc.exists()) {
-          setCurrentTransition(transitionDoc.data() as Transition);
+          const data = transitionDoc.data();
+          // Ensure each task has the correct structure
+          const tasks = data.tasks.map((task: any) => ({
+            id: task.id,
+            title: task.title,
+            completed: !!task.completed,
+            isTrap: !!task.isTrap
+          }));
+          
+          setCurrentTransition({
+            ...data,
+            tasks
+          } as Transition);
         } else {
           const initialTransition = {
             id: Date.now().toString(),
@@ -104,15 +116,39 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleTrap = async (taskId: string) => {
-    const updatedTransition = {
-      ...currentTransition,
-      tasks: currentTransition.tasks.map(task =>
-        task.id === taskId ? { ...task, isTrap: !task.isTrap } : task
-      )
-    };
+    try {
+      const task = currentTransition.tasks.find(t => t.id === taskId);
+      if (!task) return;
 
-    setCurrentTransition(updatedTransition);
-    await updateFirebaseTransition(updatedTransition);
+      // Create a new task object with explicit boolean
+      const updatedTask = {
+        ...task,
+        isTrap: task.isTrap === true ? false : true
+      };
+
+      const updatedTransition = {
+        ...currentTransition,
+        tasks: currentTransition.tasks.map(t =>
+          t.id === taskId ? updatedTask : t
+        )
+      };
+
+      // Update local state
+      setCurrentTransition(updatedTransition);
+      
+      // Update Firebase with explicit data structure
+      await setDoc(doc(db, 'activeTransition', 'current'), {
+        ...updatedTransition,
+        tasks: updatedTransition.tasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          completed: !!t.completed,
+          isTrap: !!t.isTrap
+        }))
+      });
+    } catch (error) {
+      console.error('Error toggling trap:', error);
+    }
   };
 
   const deleteTask = async (taskId: string) => {

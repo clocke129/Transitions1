@@ -64,7 +64,11 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
       const querySnapshot = await getDocs(q);
       const tasks: StaticTask[] = [];
       querySnapshot.forEach((doc) => {
-        tasks.push({ id: doc.id, ...doc.data() } as StaticTask);
+        tasks.push({
+          id: doc.id,
+          title: doc.data().title,
+          isTrap: !!doc.data().isTrap  // Ensure boolean
+        });
       });
       setStaticTasks(tasks.sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1)));
     } catch (error) {
@@ -97,19 +101,28 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
 
   const toggleTrap = async (taskId: string) => {
     try {
+      const taskRef = doc(db, 'staticTasks', taskId);
       const task = staticTasks.find(t => t.id === taskId);
       if (!task) return;
 
-      await updateDoc(doc(db, 'staticTasks', taskId), {
+      // Update Firebase first
+      await updateDoc(taskRef, {
         isTrap: !task.isTrap,
       });
 
+      // Then update local state without sorting
       setStaticTasks(prev => 
         prev.map(t => t.id === taskId ? { ...t, isTrap: !t.isTrap } : t)
-           .sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1))
       );
+
+      // Close menu
+      setMenuTask(null);
+
+      // Finally, fetch and sort tasks
+      fetchStaticTasks();
     } catch (error) {
       console.error('Error toggling trap:', error);
+      fetchStaticTasks();
     }
   };
 
@@ -207,58 +220,49 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
 
       {staticTasks.map((task) => (
         <View key={task.id} style={styles.taskItem}>
-          {editingTask === task.id ? (
-            <TextInput
-              style={styles.editInput}
-              value={editingTitle}
-              onChangeText={setEditingTitle}
-              onBlur={() => {
-                editTask(task.id, editingTitle);
-                setEditingTask(null);
-              }}
-              autoFocus
-            />
-          ) : (
-            <Pressable 
-              style={styles.taskContent}
+          <View style={styles.taskContent}>
+            <ThemedText style={[styles.taskText, task.isTrap && styles.trapText]}>
+              {task.title}
+            </ThemedText>
+            <View style={styles.actionButtons}>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onAddToTransition(task);
+                }}
+                style={styles.addToTransitionButton}
+              >
+                <Ionicons name="add-circle-outline" size={24} color="#0a7ea4" />
+              </Pressable>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setMenuTask(task.id);
+                }}
+                style={styles.menuButton}
+              >
+                <Ionicons name="ellipsis-vertical" size={24} color="#666" />
+              </Pressable>
+            </View>
+          </View>
+          {menuTask === task.id && (
+            <Pressable
+              style={styles.menuOverlay}
               onPress={(e) => {
                 e.stopPropagation();
-                setMenuTask(task.id);
+                setMenuTask(null);
               }}
             >
-              <ThemedText style={styles.taskText}>{task.title}</ThemedText>
-              <View style={styles.actionButtons}>
-                <Pressable
-                  style={[
-                    styles.addToTransitionButton,
-                    task.isTrap && styles.trapAddButton
-                  ]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    onAddToTransition(task);
-                  }}>
-                  <Ionicons 
-                    name="add-circle" 
-                    size={24} 
-                    color={task.isTrap ? "#ff4444" : "#0a7ea4"} 
-                  />
-                </Pressable>
-              </View>
-            </Pressable>
-          )}
-
-          {menuTask === task.id && (
-            <View style={styles.menuOverlay}>
               <View style={styles.menu}>
                 <Pressable 
                   style={styles.menuItem}
                   onPress={(e) => {
                     e.stopPropagation();
-                    setEditingTitle(task.title);
-                    setEditingTask(task.id);
+                    toggleTrap(task.id);
                     setMenuTask(null);
-                  }}>
-                  <ThemedText>Rename</ThemedText>
+                  }}
+                >
+                  <ThemedText>Convert to {task.isTrap ? 'Normal' : 'Trap'}</ThemedText>
                 </Pressable>
                 <Pressable 
                   style={styles.menuItem}
@@ -266,20 +270,12 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
                     e.stopPropagation();
                     deleteTask(task.id);
                     setMenuTask(null);
-                  }}>
+                  }}
+                >
                   <ThemedText style={styles.deleteText}>Delete</ThemedText>
                 </Pressable>
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    toggleTrap(task.id);
-                    setMenuTask(null);
-                  }}>
-                  <ThemedText>Convert to {task.isTrap ? 'Normal' : 'Trap'}</ThemedText>
-                </Pressable>
               </View>
-            </View>
+            </Pressable>
           )}
         </View>
       ))}
@@ -411,18 +407,21 @@ const styles = StyleSheet.create({
   },
   menuOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menu: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  menu: {
     minWidth: 150,
   },
   menuItem: {
@@ -435,5 +434,11 @@ const styles = StyleSheet.create({
   },
   menuItemLast: {
     borderBottomWidth: 0, // Remove the last border
+  },
+  trapText: {
+    // Additional styles if needed
+  },
+  menuButton: {
+    // Additional styles if needed
   },
 });

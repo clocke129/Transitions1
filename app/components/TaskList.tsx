@@ -28,6 +28,9 @@ export function TaskList() {
 
   const handleToggleTrap = async (taskId: string) => {
     try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+      
       await toggleTrap(taskId);
       setMenuTask(null);
     } catch (error) {
@@ -39,80 +42,87 @@ export function TaskList() {
     <View style={styles.container}>
       {tasks.map((task) => (
         <View key={task.id} style={styles.taskItem}>
-          {editingTask === task.id ? (
-            <TextInput
-              style={styles.editInput}
-              value={editingTitle}
-              onChangeText={setEditingTitle}
-              onBlur={() => {
-                editTask(task.id, editingTitle);
-                setEditingTask(null);
-              }}
-              autoFocus
-            />
-          ) : (
+          <View style={styles.taskContent}>
             <Pressable 
-              style={styles.taskContent}
+              style={styles.checkbox} 
               onPress={(e) => {
                 e.stopPropagation();
-                setMenuTask(task.id);
+                toggleTask(task.id);
               }}
             >
-              <ThemedText style={styles.taskText}>{task.title}</ThemedText>
-              <View style={styles.actionButtons}>
-                <Pressable 
-                  style={[
-                    styles.checkbox, 
-                    task.completed && styles.checkboxChecked,
-                    task.isTrap && styles.trapBox,
-                    task.isTrap && task.completed && styles.trapBoxCompleted
-                  ]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    toggleTask(task.id);
-                  }}>
-                  {task.completed && !task.isTrap && <Ionicons name="checkmark" size={16} color="#fff" />}
-                  {task.isTrap && <ThemedText style={[styles.trapMinus, task.completed && styles.trapMinusCompleted]}>-</ThemedText>}
-                </Pressable>
-              </View>
+              {task.completed ? (
+                <Ionicons name="checkmark-circle" size={24} color="#0a7ea4" />
+              ) : (
+                <Ionicons name="ellipse-outline" size={24} color="#666" />
+              )}
             </Pressable>
-          )}
-
-          {menuTask === task.id && (
-            <View style={styles.menuOverlay}>
-              <View style={styles.menu}>
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setEditingTitle(task.title);
-                    setEditingTask(task.id);
-                    setMenuTask(null);
-                  }}>
-                  <ThemedText>Rename</ThemedText>
-                </Pressable>
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    deleteTask(task.id);
-                    setMenuTask(null);
-                  }}>
-                  <ThemedText style={styles.deleteText}>Delete</ThemedText>
-                </Pressable>
-                <Pressable 
-                  style={[styles.menuItem, styles.menuItemLast]}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleToggleTrap(task.id);
-                  }}>
-                  <ThemedText>Convert to {task.isTrap ? 'Normal' : 'Trap'}</ThemedText>
-                </Pressable>
-              </View>
+            <View style={styles.taskTextContainer}>
+              <ThemedText style={[styles.taskText, task.isTrap && styles.trapText]}>
+                {task.title}
+              </ThemedText>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setMenuTask(task.id);
+                }}
+                style={styles.menuButton}
+              >
+                <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+              </Pressable>
             </View>
-          )}
+          </View>
         </View>
       ))}
+      
+      {menuTask && (
+        <Pressable
+          style={[
+            styles.menuOverlay,
+            {
+              top: tasks.findIndex(t => t.id === menuTask) * 45 + 45, // Approximate task height
+              right: 12,
+            }
+          ]}
+          onPress={(e) => {
+            e.stopPropagation();
+            setMenuTask(null);
+          }}
+        >
+          <View style={styles.menu}>
+            <Pressable 
+              style={styles.menuItem}
+              onPress={(e) => {
+                e.stopPropagation();
+                setEditingTitle(tasks.find(t => t.id === menuTask)?.title || '');
+                setEditingTask(menuTask);
+                setMenuTask(null);
+              }}
+            >
+              <ThemedText>Rename</ThemedText>
+            </Pressable>
+            <Pressable 
+              style={styles.menuItem}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleToggleTrap(menuTask);
+                setMenuTask(null);
+              }}
+            >
+              <ThemedText>Convert to {tasks.find(t => t.id === menuTask)?.isTrap ? 'Normal' : 'Trap'}</ThemedText>
+            </Pressable>
+            <Pressable 
+              style={styles.menuItem}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDelete(menuTask);
+                setMenuTask(null);
+              }}
+            >
+              <ThemedText style={styles.deleteText}>Delete</ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -120,28 +130,58 @@ export function TaskList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'relative',
   },
   taskItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   taskContent: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
+  },
+  taskTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 4,
   },
   taskText: {
-    flex: 1,
-    marginRight: 16,
+    fontSize: 16,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  trapText: {
+    color: '#ff4444',
+  },
+  menuButton: {
+    padding: 4,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    zIndex: 1000,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menu: {
+    minWidth: 150,
+    backgroundColor: 'white',
+  },
+  menuItem: {
+    padding: 12,
+  },
+  deleteText: {
+    color: '#ff4444',
   },
   editInput: {
     flex: 1,
@@ -151,61 +191,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: '#666',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: 12,
   },
-  checkboxChecked: {
-    backgroundColor: '#0a7ea4',
-    borderColor: '#0a7ea4',
-  },
-  menuOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menu: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 8,
-    minWidth: 150,
-  },
-  menuItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  menuItemLast: {
-    borderBottomWidth: 0,
-  },
-  deleteText: {
-    color: '#ff4444',
-  },
-  trapBox: {
-    backgroundColor: '#ff4444',
-    borderColor: '#ff4444',
-    borderRadius: 50,
-  },
-  trapBoxCompleted: {
-    backgroundColor: '#ff8888',
-    borderColor: '#ff8888',
-  },
-  trapMinus: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: -2,
-  },
-  trapMinusCompleted: {
-    color: '#eee',
-  }
 }); 
