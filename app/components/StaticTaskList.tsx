@@ -63,7 +63,7 @@ const TaskRow = ({
           }}
         >
           <Ionicons 
-            name="add-circle-outline" 
+            name={task.isTrap ? "remove-circle-outline" : "add-circle-outline"}
             size={24} 
             color="#0a7ea4" 
           />

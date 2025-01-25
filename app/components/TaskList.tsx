@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Alert, Animated } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useTaskContext } from '@/app/context/TaskContext';
@@ -12,6 +12,10 @@ export function TaskList() {
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => (a.isTrap === b.isTrap ? 0 : a.isTrap ? 1 : -1));
+  }, [tasks]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -57,7 +61,7 @@ export function TaskList() {
 
   return (
     <View style={styles.container}>
-      {tasks.map((task) => (
+      {sortedTasks.map((task) => (
         <View 
           key={task.id} 
           style={[

@@ -116,6 +116,13 @@ export default function TransitionsScreen() {
                 value={newTaskTitle}
                 onChangeText={setNewTaskTitle}
                 placeholder="Add a task to this transition..."
+                onSubmitEditing={() => {
+                  if (newTaskTitle.trim()) {
+                    addTask(newTaskTitle.trim());
+                    setNewTaskTitle('');
+                  }
+                }}
+                returnKeyType="enter"
               />
               <Pressable 
                 style={styles.addButton}
