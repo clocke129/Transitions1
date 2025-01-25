@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, Pressable, TextInput, Alert, Animated } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Task } from '@/app/context/TaskContext';
 import { Transition } from '@/app/context/TransitionContext';
@@ -425,6 +425,29 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
     }
   };
 
+  const handleTestReset = async () => {
+    try {
+      const transitionRef = doc(db, 'activeTransition', 'current');
+      const currentData = (await getDoc(transitionRef)).data();
+
+      if (currentData) {
+        // Keep existing tasks but reset transition number
+        const updatedTransition = {
+          ...currentData,
+          number: 1,
+          title: 'Transition 1',
+          lastResetDate: new Date().toDateString()
+        };
+
+        await setDoc(transitionRef, updatedTransition);
+        // Force reload the page to reflect changes
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error handling test reset:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ThemedText style={styles.title}>Quick Add</ThemedText>
@@ -476,6 +499,15 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
           setSelectedTemplate={setSelectedTemplate}
         />
       ))}
+
+      <View style={styles.footer}>
+        <Pressable 
+          style={styles.resetButton}
+          onPress={handleTestReset}
+        >
+          <ThemedText style={styles.resetButtonText}>Test Reset</ThemedText>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -656,5 +688,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     gap: 16,
+  },
+  footer: {
+    marginTop: 'auto',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  resetButton: {
+    backgroundColor: '#ff9999',  // Light red to indicate it's for testing
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: '#555',
+    fontWeight: '500',
   },
 });
