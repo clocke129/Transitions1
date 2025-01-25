@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, Pressable, TextInput, Alert, Animated } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
@@ -26,6 +26,120 @@ interface Props {
   updateTransitionTitle: (title: string) => Promise<void>;
 }
 
+const TaskRow = ({ 
+  task, 
+  onAddToTransition, 
+  onEdit, 
+  onToggleTrap, 
+  onDelete 
+}: {
+  task: any;
+  onAddToTransition: (task: any) => void;
+  onEdit: (id: string, title: string | null) => void;
+  onToggleTrap: (id: string) => void;
+  onDelete: (id: string) => void;
+}) => {
+  const [selectedTask, setSelectedTask] = useState(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: selectedTask ? 1 : 0,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedTask]);
+
+  return (
+    <Pressable
+      style={[styles.taskRow, selectedTask && styles.selectedRow]}
+      onPress={() => setSelectedTask(!selectedTask)}
+    >
+      <View style={styles.taskContent}>
+        <Pressable
+          style={styles.addToTransitionButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onAddToTransition(task);
+          }}
+        >
+          <Ionicons 
+            name="add-circle-outline" 
+            size={24} 
+            color="#0a7ea4" 
+          />
+        </Pressable>
+        <ThemedText style={styles.taskText}>{task.title}</ThemedText>
+      </View>
+      {selectedTask && (
+        <Animated.View
+          style={[
+            styles.actionIcons,
+            {
+              transform: [{
+                translateX: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [100, 0],
+                })
+              }],
+              opacity: slideAnim
+            }
+          ]}
+        >
+          <Pressable 
+            style={styles.iconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onEdit(task.id, task.title);
+            }}
+          >
+            <Ionicons name="pencil-outline" size={20} color="#666" />
+          </Pressable>
+          <Pressable 
+            style={styles.iconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onToggleTrap(task.id);
+            }}
+          >
+            <Ionicons 
+              name={task.isTrap ? "remove-circle-outline" : "checkmark-circle-outline"} 
+              size={20} 
+              color="#666" 
+            />
+          </Pressable>
+          <Pressable 
+            style={styles.iconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onDelete(task.id);
+            }}
+          >
+            <Ionicons name="trash-outline" size={20} color="#666" />
+          </Pressable>
+        </Animated.View>
+      )}
+    </Pressable>
+  );
+};
+
+const TemplateRow = ({ template, onPress }) => (
+  <Pressable 
+    style={styles.templateRow} 
+    onPress={onPress}
+  >
+    <View style={styles.templateContent}>
+      <View style={styles.circleIconContainer}>
+        <Ionicons 
+          name="add-circle-outline" 
+          size={24} 
+          color="#0a7ea4" 
+        />
+      </View>
+      <ThemedText>{template.title}</ThemedText>
+    </View>
+  </Pressable>
+);
+
 export function StaticTaskList({ onAddToTransition, currentTransition, updateTransitionTitle }: Props) {
   const [staticTasks, setStaticTasks] = useState<StaticTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -33,6 +147,14 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
   const [menuTask, setMenuTask] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+
+  const icons = {
+    edit: "pencil",           // or "pencil-outline"
+    delete: "trash-bin",      // or "trash-bin-outline"
+    normalTask: "checkmark-circle-outline",
+    trapTask: "remove-circle-outline"
+  }
 
   useEffect(() => {
     fetchStaticTasks();
@@ -201,6 +323,19 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  const handleEdit = (taskId: string, newTitle: string | null) => {
+    setEditingTask(taskId);
+    setEditingTitle(newTitle || '');
+  };
+
+  const handleToggleTrap = (taskId: string) => {
+    toggleTrap(taskId);
+  };
+
+  const handleDelete = (taskId: string) => {
+    deleteTask(taskId);
+  };
+
   return (
     <View style={styles.container}>
       <ThemedText style={styles.title}>Quick Add</ThemedText>
@@ -219,69 +354,14 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
       </View>
 
       {staticTasks.map((task) => (
-        <View key={task.id} style={styles.taskItem}>
-          <View style={styles.taskContent}>
-            <View style={styles.actionButtons}>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onAddToTransition(task);
-                }}
-                style={styles.addToTransitionButton}
-              >
-                <Ionicons 
-                  name={task.isTrap ? "remove-circle-outline" : "add-circle-outline"} 
-                  size={24} 
-                  color="#0a7ea4" 
-                />
-              </Pressable>
-            </View>
-            <ThemedText style={styles.taskText}>
-              {task.title}
-            </ThemedText>
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                setMenuTask(task.id);
-              }}
-              style={styles.menuButton}
-            >
-              <Ionicons name="ellipsis-vertical" size={20} color="#666" />
-            </Pressable>
-          </View>
-          {menuTask === task.id && (
-            <Pressable
-              style={styles.menuOverlay}
-              onPress={(e) => {
-                e.stopPropagation();
-                setMenuTask(null);
-              }}
-            >
-              <View style={styles.menu}>
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    toggleTrap(task.id);
-                    setMenuTask(null);
-                  }}
-                >
-                  <ThemedText>Convert to {task.isTrap ? 'Normal' : 'Trap'}</ThemedText>
-                </Pressable>
-                <Pressable 
-                  style={styles.menuItem}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    deleteTask(task.id);
-                    setMenuTask(null);
-                  }}
-                >
-                  <ThemedText style={styles.deleteText}>Delete</ThemedText>
-                </Pressable>
-              </View>
-            </Pressable>
-          )}
-        </View>
+        <TaskRow
+          key={task.id}
+          task={task}
+          onAddToTransition={onAddToTransition}
+          onEdit={handleEdit}
+          onToggleTrap={handleToggleTrap}
+          onDelete={handleDelete}
+        />
       ))}
 
       {/* Templates Section */}
@@ -295,21 +375,11 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
         </Pressable>
 
         {templates.map((template) => (
-          <View key={template.id} style={styles.templateRow}>
-            <View style={styles.taskContent}>
-              <View style={styles.actionButtons}>
-                <Pressable 
-                  style={styles.addToTransitionButton}
-                  onPress={() => useTemplate(template)}
-                >
-                  <Ionicons name="add-circle-outline" size={24} color="#0a7ea4" />
-                </Pressable>
-              </View>
-              <ThemedText style={styles.taskText}>
-                {template.title}
-              </ThemedText>
-            </View>
-          </View>
+          <TemplateRow
+            key={template.id}
+            template={template}
+            onPress={() => useTemplate(template)}
+          />
         ))}
       </View>
     </View>
@@ -378,11 +448,11 @@ const styles = StyleSheet.create({
   },
   editInput: {
     flex: 1,
+    padding: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#ddd',
     borderRadius: 4,
-    padding: 4,
-    marginRight: 8,
+    backgroundColor: 'white',
   },
   templatesSection: {
     marginTop: 32,
@@ -403,14 +473,21 @@ const styles = StyleSheet.create({
   templateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  templateTitle: {
-    fontSize: 14,
+  templateContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+    gap: 8,
+  },
+  circleIconContainer: {
+    width: 40,  // Fixed width to align all icons
+    height: 40, // Fixed height to align all icons
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   menuOverlay: {
     position: 'absolute',
@@ -446,6 +523,27 @@ const styles = StyleSheet.create({
     // Additional styles if needed
   },
   menuButton: {
+    padding: 8,
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  selectedRow: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  actionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingLeft: 16,
+  },
+  iconButton: {
     padding: 8,
   },
 });

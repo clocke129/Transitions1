@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Pressable, TextInput, Alert, Animated } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useTaskContext } from '@/app/context/TaskContext';
 import { Ionicons } from '@expo/vector-icons';
+import { Platform } from 'react-native';
 
 export function TaskList() {
   const { tasks, toggleTask, toggleTrap, deleteTask, editTask } = useTaskContext();
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [menuTask, setMenuTask] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
+  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const handleClickOutside = () => {
-      setMenuTask(null);
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    if (Platform.OS === 'web') {
+      const handleClickOutside = () => {
+        setSelectedTask(null);
+      };
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
   }, []);
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: selectedTask ? 1 : 0,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedTask]);
 
   const handleDelete = async (taskId: string) => {
     try {
@@ -38,17 +50,25 @@ export function TaskList() {
     }
   };
 
+  const handleEdit = (taskId: string, newTitle: string) => {
+    editTask(taskId, newTitle);
+    setEditingTask(null);
+  };
+
   return (
     <View style={styles.container}>
       {tasks.map((task) => (
-        <View key={task.id} style={styles.taskItem}>
+        <View 
+          key={task.id} 
+          style={[
+            styles.taskItem,
+            selectedTask === task.id && styles.selectedRow
+          ]}
+        >
           <View style={styles.taskContent}>
             <Pressable 
               style={styles.checkbox} 
-              onPress={(e) => {
-                e.stopPropagation();
-                toggleTask(task.id);
-              }}
+              onPress={() => toggleTask(task.id)}
             >
               {task.completed ? (
                 <Ionicons 
@@ -64,20 +84,63 @@ export function TaskList() {
                 />
               )}
             </Pressable>
-            <View style={styles.taskTextContainer}>
+            <Pressable
+              style={styles.taskTextContainer}
+              onPress={() => setSelectedTask(task.id === selectedTask ? null : task.id)}
+            >
               <ThemedText style={styles.taskText}>
                 {task.title}
               </ThemedText>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setMenuTask(task.id);
-                }}
-                style={styles.menuButton}
-              >
-                <Ionicons name="ellipsis-vertical" size={20} color="#666" />
-              </Pressable>
-            </View>
+              {selectedTask === task.id && (
+                <Animated.View
+                  style={[
+                    styles.actionIcons,
+                    {
+                      transform: [{
+                        translateX: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [100, 0],
+                        })
+                      }],
+                      opacity: slideAnim
+                    }
+                  ]}
+                >
+                  <Pressable 
+                    style={styles.iconButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setEditingTitle(task.title);
+                      setEditingTask(task.id);
+                    }}
+                  >
+                    <Ionicons name="pencil-outline" size={20} color="#666" />
+                  </Pressable>
+                  <Pressable 
+                    style={styles.iconButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleToggleTrap(task.id);
+                    }}
+                  >
+                    <Ionicons 
+                      name={task.isTrap ? "remove-circle-outline" : "checkmark-circle-outline"} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </Pressable>
+                  <Pressable 
+                    style={styles.iconButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDelete(task.id);
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#666" />
+                  </Pressable>
+                </Animated.View>
+              )}
+            </Pressable>
           </View>
         </View>
       ))}
@@ -156,7 +219,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 4,
+    justifyContent: 'space-between',
+    gap: 16,
   },
   taskText: {
     fontSize: 16,
@@ -200,6 +264,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   checkbox: {
-    marginRight: 8,
+    padding: 8,
+  },
+  actionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingLeft: 16,
+  },
+  iconButton: {
+    padding: 8,
+  },
+  selectedRow: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
 }); 
