@@ -122,23 +122,88 @@ const TaskRow = ({
   );
 };
 
-const TemplateRow = ({ template, onPress }) => (
-  <Pressable 
-    style={styles.templateRow} 
-    onPress={onPress}
-  >
-    <View style={styles.templateContent}>
-      <View style={styles.circleIconContainer}>
-        <Ionicons 
-          name="add-circle-outline" 
-          size={24} 
-          color="#0a7ea4" 
-        />
+const TemplateRow = ({ 
+  template, 
+  onPress, 
+  onDelete, 
+  onEdit,
+  selectedTemplate,
+  setSelectedTemplate 
+}) => {
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: selectedTemplate === template.id ? 1 : 0,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedTemplate]);
+
+  return (
+    <View 
+      style={[
+        styles.taskItem,
+        selectedTemplate === template.id && styles.selectedRow
+      ]}
+    >
+      <View style={styles.taskContent}>
+        <Pressable
+          style={styles.circleIconContainer}
+          onPress={onPress}
+        >
+          <Ionicons 
+            name="add-circle-outline"
+            size={24} 
+            color="#0a7ea4" 
+          />
+        </Pressable>
+        <Pressable
+          style={styles.taskTextContainer}
+          onPress={() => setSelectedTemplate(selectedTemplate === template.id ? null : template.id)}
+        >
+          <ThemedText style={styles.taskText}>
+            {template.title}
+          </ThemedText>
+          {selectedTemplate === template.id && (
+            <Animated.View
+              style={[
+                styles.actionIcons,
+                {
+                  transform: [{
+                    translateX: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [100, 0],
+                    })
+                  }],
+                  opacity: slideAnim
+                }
+              ]}
+            >
+              <Pressable 
+                style={styles.iconButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onEdit(template.id, template.title);
+                }}
+              >
+                <Ionicons name="pencil-outline" size={20} color="#666" />
+              </Pressable>
+              <Pressable 
+                style={styles.iconButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onDelete(template.id);
+                }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#666" />
+              </Pressable>
+            </Animated.View>
+          )}
+        </Pressable>
       </View>
-      <ThemedText>{template.title}</ThemedText>
     </View>
-  </Pressable>
-);
+  );
+};
 
 export function StaticTaskList({ onAddToTransition, currentTransition, updateTransitionTitle }: Props) {
   const [staticTasks, setStaticTasks] = useState<StaticTask[]>([]);
@@ -148,6 +213,9 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
+  const [editingTemplateTitle, setEditingTemplateTitle] = useState('');
 
   const icons = {
     edit: "pencil",           // or "pencil-outline"
@@ -336,6 +404,27 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
     deleteTask(taskId);
   };
 
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await deleteDoc(doc(db, 'staticTemplates', templateId));
+      setSelectedTemplate(null);
+    } catch (error) {
+      console.error('Error deleting template:', error);
+    }
+  };
+
+  const handleEditTemplate = async (templateId: string, newTitle: string) => {
+    try {
+      await updateDoc(doc(db, 'staticTemplates', templateId), {
+        title: newTitle,
+      });
+      setEditingTemplate(null);
+      setSelectedTemplate(null);
+    } catch (error) {
+      console.error('Error editing template:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ThemedText style={styles.title}>Quick Add</ThemedText>
@@ -364,24 +453,29 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
         />
       ))}
 
-      {/* Templates Section */}
-      <View style={styles.templatesSection}>
-        <ThemedText style={styles.title}>Templates</ThemedText>
-        <Pressable 
-          style={styles.addTemplateButton}
-          onPress={addTemplate}
-        >
-          <ThemedText style={styles.buttonText}>Add Template</ThemedText>
-        </Pressable>
+      <ThemedText style={styles.sectionTitle}>Templates</ThemedText>
+      
+      <Pressable 
+        style={styles.addTemplateButton}
+        onPress={addTemplate}
+      >
+        <ThemedText style={styles.addTemplateText}>Add Template</ThemedText>
+      </Pressable>
 
-        {templates.map((template) => (
-          <TemplateRow
-            key={template.id}
-            template={template}
-            onPress={() => useTemplate(template)}
-          />
-        ))}
-      </View>
+      {templates.map((template) => (
+        <TemplateRow
+          key={template.id}
+          template={template}
+          onPress={() => useTemplate(template)}
+          onDelete={handleDeleteTemplate}
+          onEdit={(id) => {
+            setEditingTemplateTitle(template.title);
+            setEditingTemplate(id);
+          }}
+          selectedTemplate={selectedTemplate}
+          setSelectedTemplate={setSelectedTemplate}
+        />
+      ))}
     </View>
   );
 }
@@ -462,10 +556,14 @@ const styles = StyleSheet.create({
   },
   addTemplateButton: {
     backgroundColor: '#0a7ea4',
-    padding: 8,
+    padding: 12,
     borderRadius: 8,
+    marginBottom: 16,
     alignItems: 'center',
-    marginTop: 8,
+  },
+  addTemplateText: {
+    color: 'white',
+    fontWeight: '500',
   },
   buttonText: {
     color: 'white',
@@ -484,8 +582,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   circleIconContainer: {
-    width: 40,  // Fixed width to align all icons
-    height: 40, // Fixed height to align all icons
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -545,5 +643,18 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  taskTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'space-between',
+    gap: 16,
   },
 });
