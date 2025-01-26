@@ -103,13 +103,17 @@ export default function StatisticsScreen() {
           style={[styles.toggleButton, activeView === 'stats' && styles.activeToggle]} 
           onPress={() => setActiveView('stats')}
         >
-          <ThemedText>Stats</ThemedText>
+          <ThemedText style={activeView === 'stats' ? styles.activeText : styles.toggleText}>
+            Stats
+          </ThemedText>
         </Pressable>
         <Pressable 
           style={[styles.toggleButton, activeView === 'calendar' && styles.activeToggle]}
           onPress={() => setActiveView('calendar')}
         >
-          <ThemedText>Calendar</ThemedText>
+          <ThemedText style={activeView === 'calendar' ? styles.activeText : styles.toggleText}>
+            Calendar
+          </ThemedText>
         </Pressable>
       </View>
 
@@ -137,7 +141,7 @@ export default function StatisticsScreen() {
           </View>
         </View>
       ) : (
-        <CalendarView />
+        <CalendarView selectedDate={selectedDate} />
       )}
     </ScrollView>
   );
@@ -193,5 +197,11 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  toggleText: {
+    color: '#666',
+  },
+  activeText: {
+    color: 'white',
   },
 }); 
