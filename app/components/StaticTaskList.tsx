@@ -226,6 +226,10 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
 
   const windowWidth = Dimensions.get('window').width;
   const isMobileWidth = windowWidth < 768;
+  
+  const sidebarWidth = isMobileWidth 
+    ? Math.min(Math.max(300, windowWidth * 0.75), 400)
+    : '30%';
 
   useEffect(() => {
     fetchStaticTasks();
@@ -454,91 +458,103 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
   return (
     <View style={[
       styles.container,
+      { width: sidebarWidth },
       isMobileWidth && styles.mobileContainer
     ]}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <ThemedText style={styles.title}>Quick Add</ThemedText>
-          
-          <View style={styles.addContainer}>
-            <TextInput
-              style={styles.input}
-              value={newTaskTitle}
-              onChangeText={setNewTaskTitle}
-              placeholder="Add to quick list..."
-              onSubmitEditing={addStaticTask}
-            />
-            <Pressable style={styles.addButton} onPress={addStaticTask}>
-              <ThemedText style={styles.addButtonText}>Add</ThemedText>
-            </Pressable>
-          </View>
+      <View style={styles.innerContainer}>
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={true}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.content}>
+            <ThemedText style={styles.title}>Quick Add</ThemedText>
+            
+            <View style={styles.addContainer}>
+              <TextInput
+                style={styles.input}
+                value={newTaskTitle}
+                onChangeText={setNewTaskTitle}
+                placeholder="Add to quick list..."
+                onSubmitEditing={addStaticTask}
+              />
+              <Pressable style={styles.addButton} onPress={addStaticTask}>
+                <ThemedText style={styles.addButtonText}>Add</ThemedText>
+              </Pressable>
+            </View>
 
-          {staticTasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onAddToTransition={onAddToTransition}
-              onEdit={handleEdit}
-              onToggleTrap={handleToggleTrap}
-              onDelete={handleDelete}
-            />
-          ))}
+            {staticTasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                onAddToTransition={onAddToTransition}
+                onEdit={handleEdit}
+                onToggleTrap={handleToggleTrap}
+                onDelete={handleDelete}
+              />
+            ))}
 
-          <ThemedText style={styles.sectionTitle}>Templates</ThemedText>
-          
-          <Pressable 
-            style={styles.addTemplateButton}
-            onPress={addTemplate}
-          >
-            <ThemedText style={styles.addTemplateText}>Add Template</ThemedText>
-          </Pressable>
-
-          {templates.map((template) => (
-            <TemplateRow
-              key={template.id}
-              template={template}
-              onPress={() => useTemplate(template)}
-              onDelete={handleDeleteTemplate}
-              onEdit={(id) => {
-                setEditingTemplateTitle(template.title);
-                setEditingTemplate(id);
-              }}
-              selectedTemplate={selectedTemplate}
-              setSelectedTemplate={setSelectedTemplate}
-            />
-          ))}
-
-          <View style={styles.footer}>
+            <ThemedText style={styles.sectionTitle}>Templates</ThemedText>
+            
             <Pressable 
-              style={styles.resetButton}
-              onPress={handleTestReset}
+              style={styles.addTemplateButton}
+              onPress={addTemplate}
             >
-              <ThemedText style={styles.resetButtonText}>Test Reset</ThemedText>
+              <ThemedText style={styles.addTemplateText}>Add Template</ThemedText>
             </Pressable>
+
+            {templates.map((template) => (
+              <TemplateRow
+                key={template.id}
+                template={template}
+                onPress={() => useTemplate(template)}
+                onDelete={handleDeleteTemplate}
+                onEdit={(id) => {
+                  setEditingTemplateTitle(template.title);
+                  setEditingTemplate(id);
+                }}
+                selectedTemplate={selectedTemplate}
+                setSelectedTemplate={setSelectedTemplate}
+              />
+            ))}
+
+            <View style={styles.footer}>
+              <Pressable 
+                style={styles.resetButton}
+                onPress={handleTestReset}
+              >
+                <ThemedText style={styles.resetButtonText}>Test Reset</ThemedText>
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: '30%',
-    minWidth: 200,
-    maxWidth: '100%',
+    width: 400, // Increased fixed width
+    minWidth: 400, // Ensure it doesn't shrink
+    flexShrink: 0, // Prevent shrinking when space is tight
     height: '100%',
+    backgroundColor: '#f5f5f5',
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    overflow: 'hidden',
+  },
+  innerContainer: {
+    flex: 1,
+    height: '100%',
+    position: 'relative',
   },
   mobileContainer: {
-    width: '75%',  // Takes up more space on mobile
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
     zIndex: 1,
-    backgroundColor: '#f5f5f5',
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 2,
@@ -551,9 +567,12 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
     padding: 16,
-    paddingBottom: 100, // Extra padding for scroll
+    width: '100%', // Ensure content takes full width
   },
   title: {
     fontSize: 18,
@@ -564,9 +583,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+    width: '100%', // Ensure full width
   },
   input: {
     flex: 1,
+    minWidth: 0, // Allow input to shrink if needed
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,

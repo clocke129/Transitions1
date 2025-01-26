@@ -58,18 +58,20 @@ export default function TransitionsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
+      <View style={styles.header}>
         <Pressable 
           style={styles.toggleButton} 
           onPress={() => setShowStaticList(!showStaticList)}
         >
           <Ionicons 
-            name={showStaticList ? "chevron-back" : "chevron-forward"} 
+            name={showStaticList ? "menu" : "menu-outline"} 
             size={24} 
             color="#0a7ea4" 
           />
         </Pressable>
-
+      </View>
+      
+      <View style={styles.content}>
         {showStaticList && (
           <StaticTaskList 
             onAddToTransition={handleAddFromStatic}
@@ -77,7 +79,6 @@ export default function TransitionsScreen() {
             updateTransitionTitle={updateTransitionTitle}
           />
         )}
-
         <View style={styles.transitionContainer}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.header}>
@@ -161,22 +162,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    height: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#f5f5f5',
+  },
+  toggleButton: {
+    padding: 2,
+    marginLeft: -2,
+  },
   content: {
     flex: 1,
     flexDirection: 'row',
-  },
-  toggleButton: {
-    padding: 8,
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-    zIndex: 2,
+    marginTop: 2,
   },
   transitionContainer: {
     flex: 1,
     padding: 16,
     minWidth: 0,
+    overflow: 'auto',
   },
   scrollContainer: {
     flexGrow: 1,
