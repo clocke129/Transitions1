@@ -163,17 +163,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     backgroundColor: '#f5f5f5',
   },
   toggleButton: {
-    padding: 2,
-    marginLeft: -2,
+    padding: 12,
+    marginRight: 20,
+    borderRadius: 8,
   },
   content: {
     flex: 1,
