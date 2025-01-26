@@ -171,10 +171,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
+    zIndex: 2,
   },
   transitionContainer: {
     flex: 1,
     padding: 16,
+    minWidth: 0,
   },
   scrollContainer: {
     flexGrow: 1,

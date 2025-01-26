@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Pressable, TextInput, Alert, Animated } from 'react-native';
+import { View, StyleSheet, Pressable, TextInput, Alert, Animated, ScrollView, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
@@ -223,6 +223,9 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
     normalTask: "checkmark-circle-outline",
     trapTask: "remove-circle-outline"
   }
+
+  const windowWidth = Dimensions.get('window').width;
+  const isMobileWidth = windowWidth < 768;
 
   useEffect(() => {
     fetchStaticTasks();
@@ -449,65 +452,72 @@ export function StaticTaskList({ onAddToTransition, currentTransition, updateTra
   };
 
   return (
-    <View style={styles.container}>
-      <ThemedText style={styles.title}>Quick Add</ThemedText>
-      
-      <View style={styles.addContainer}>
-        <TextInput
-          style={styles.input}
-          value={newTaskTitle}
-          onChangeText={setNewTaskTitle}
-          placeholder="Add to quick list..."
-          onSubmitEditing={addStaticTask}
-        />
-        <Pressable style={styles.addButton} onPress={addStaticTask}>
-          <ThemedText style={styles.addButtonText}>Add</ThemedText>
-        </Pressable>
-      </View>
+    <View style={[
+      styles.container,
+      isMobileWidth && styles.mobileContainer
+    ]}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          <ThemedText style={styles.title}>Quick Add</ThemedText>
+          
+          <View style={styles.addContainer}>
+            <TextInput
+              style={styles.input}
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              placeholder="Add to quick list..."
+              onSubmitEditing={addStaticTask}
+            />
+            <Pressable style={styles.addButton} onPress={addStaticTask}>
+              <ThemedText style={styles.addButtonText}>Add</ThemedText>
+            </Pressable>
+          </View>
 
-      {staticTasks.map((task) => (
-        <TaskRow
-          key={task.id}
-          task={task}
-          onAddToTransition={onAddToTransition}
-          onEdit={handleEdit}
-          onToggleTrap={handleToggleTrap}
-          onDelete={handleDelete}
-        />
-      ))}
+          {staticTasks.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              onAddToTransition={onAddToTransition}
+              onEdit={handleEdit}
+              onToggleTrap={handleToggleTrap}
+              onDelete={handleDelete}
+            />
+          ))}
 
-      <ThemedText style={styles.sectionTitle}>Templates</ThemedText>
-      
-      <Pressable 
-        style={styles.addTemplateButton}
-        onPress={addTemplate}
-      >
-        <ThemedText style={styles.addTemplateText}>Add Template</ThemedText>
-      </Pressable>
+          <ThemedText style={styles.sectionTitle}>Templates</ThemedText>
+          
+          <Pressable 
+            style={styles.addTemplateButton}
+            onPress={addTemplate}
+          >
+            <ThemedText style={styles.addTemplateText}>Add Template</ThemedText>
+          </Pressable>
 
-      {templates.map((template) => (
-        <TemplateRow
-          key={template.id}
-          template={template}
-          onPress={() => useTemplate(template)}
-          onDelete={handleDeleteTemplate}
-          onEdit={(id) => {
-            setEditingTemplateTitle(template.title);
-            setEditingTemplate(id);
-          }}
-          selectedTemplate={selectedTemplate}
-          setSelectedTemplate={setSelectedTemplate}
-        />
-      ))}
+          {templates.map((template) => (
+            <TemplateRow
+              key={template.id}
+              template={template}
+              onPress={() => useTemplate(template)}
+              onDelete={handleDeleteTemplate}
+              onEdit={(id) => {
+                setEditingTemplateTitle(template.title);
+                setEditingTemplate(id);
+              }}
+              selectedTemplate={selectedTemplate}
+              setSelectedTemplate={setSelectedTemplate}
+            />
+          ))}
 
-      <View style={styles.footer}>
-        <Pressable 
-          style={styles.resetButton}
-          onPress={handleTestReset}
-        >
-          <ThemedText style={styles.resetButtonText}>Test Reset</ThemedText>
-        </Pressable>
-      </View>
+          <View style={styles.footer}>
+            <Pressable 
+              style={styles.resetButton}
+              onPress={handleTestReset}
+            >
+              <ThemedText style={styles.resetButtonText}>Test Reset</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -516,9 +526,34 @@ const styles = StyleSheet.create({
   container: {
     width: '30%',
     minWidth: 200,
-    padding: 16,
+    maxWidth: '100%',
+    height: '100%',
+  },
+  mobileContainer: {
+    width: '75%',  // Takes up more space on mobile
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 1,
     backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 2,
+      height: 0,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 100, // Extra padding for scroll
   },
   title: {
     fontSize: 18,
