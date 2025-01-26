@@ -83,7 +83,7 @@ export default function StatisticsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.dateSelector}>
         <Pressable onPress={() => setSelectedDate(prev => subDays(prev, 1))}>
           <Ionicons name="chevron-back" size={24} color="#0a7ea4" />
@@ -118,7 +118,7 @@ export default function StatisticsScreen() {
       </View>
 
       {activeView === 'stats' ? (
-        <View style={styles.statsContainer}>
+        <ScrollView style={styles.statsContainer}>
           <View style={styles.statItem}>
             <ThemedText style={styles.label}>Total Transitions</ThemedText>
             <ThemedText style={styles.value}>{stats.totalTransitions}</ThemedText>
@@ -139,18 +139,23 @@ export default function StatisticsScreen() {
               }%)`}
             </ThemedText>
           </View>
-        </View>
+        </ScrollView>
       ) : (
-        <CalendarView selectedDate={selectedDate} />
+        <View style={styles.calendarContainer}>
+          <CalendarView selectedDate={selectedDate} />
+        </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    backgroundColor: '#fff',
+  },
+  calendarContainer: {
+    flex: 1,
   },
   dateSelector: {
     flexDirection: 'row',
