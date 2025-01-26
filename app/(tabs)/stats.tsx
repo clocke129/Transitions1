@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, addDays, subDays } from 'date-fns';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { CalendarView } from '../components/CalendarView';
 
 export default function StatisticsScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -13,6 +14,7 @@ export default function StatisticsScreen() {
     totalTime: 0,
     trapsRatio: { avoided: 0, total: 0 }
   });
+  const [activeView, setActiveView] = useState<'stats' | 'calendar'>('stats');
 
   const fetchDayStats = async (date: Date) => {
     try {
@@ -76,7 +78,8 @@ export default function StatisticsScreen() {
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -95,28 +98,47 @@ export default function StatisticsScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <ThemedText style={styles.label}>Total Transitions</ThemedText>
-          <ThemedText style={styles.value}>{stats.totalTransitions}</ThemedText>
-        </View>
-
-        <View style={styles.statItem}>
-          <ThemedText style={styles.label}>Total Time</ThemedText>
-          <ThemedText style={styles.value}>{formatTime(stats.totalTime)}</ThemedText>
-        </View>
-
-        <View style={styles.statItem}>
-          <ThemedText style={styles.label}>Traps Avoided</ThemedText>
-          <ThemedText style={styles.value}>
-            {`${stats.trapsRatio.avoided}/${stats.trapsRatio.total} (${
-              stats.trapsRatio.total === 0 
-                ? '0' 
-                : Math.round((stats.trapsRatio.avoided / stats.trapsRatio.total) * 100)
-            }%)`}
-          </ThemedText>
-        </View>
+      <View style={styles.viewToggle}>
+        <Pressable 
+          style={[styles.toggleButton, activeView === 'stats' && styles.activeToggle]} 
+          onPress={() => setActiveView('stats')}
+        >
+          <ThemedText>Stats</ThemedText>
+        </Pressable>
+        <Pressable 
+          style={[styles.toggleButton, activeView === 'calendar' && styles.activeToggle]}
+          onPress={() => setActiveView('calendar')}
+        >
+          <ThemedText>Calendar</ThemedText>
+        </Pressable>
       </View>
+
+      {activeView === 'stats' ? (
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <ThemedText style={styles.label}>Total Transitions</ThemedText>
+            <ThemedText style={styles.value}>{stats.totalTransitions}</ThemedText>
+          </View>
+
+          <View style={styles.statItem}>
+            <ThemedText style={styles.label}>Total Time</ThemedText>
+            <ThemedText style={styles.value}>{formatTime(stats.totalTime)}</ThemedText>
+          </View>
+
+          <View style={styles.statItem}>
+            <ThemedText style={styles.label}>Traps Avoided</ThemedText>
+            <ThemedText style={styles.value}>
+              {`${stats.trapsRatio.avoided}/${stats.trapsRatio.total} (${
+                stats.trapsRatio.total === 0 
+                  ? '0' 
+                  : Math.round((stats.trapsRatio.avoided / stats.trapsRatio.total) * 100)
+              }%)`}
+            </ThemedText>
+          </View>
+        </View>
+      ) : (
+        <CalendarView />
+      )}
     </ScrollView>
   );
 }
@@ -139,6 +161,21 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  toggleButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+  },
+  activeToggle: {
+    backgroundColor: '#0a7ea4',
   },
   statsContainer: {
     gap: 16,
