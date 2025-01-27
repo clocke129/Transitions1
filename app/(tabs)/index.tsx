@@ -42,7 +42,7 @@ export default function TransitionsScreen() {
   const handleFinish = async () => {
     if (isTimerRunning) {
       setIsTimerRunning(false);
-      await archiveTransition(elapsedTime);
+      await archiveTransition(elapsedTime, currentTransition.title);
       setElapsedTime(0);
       setNewTaskTitle('');
     } else {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, Pressable, Modal } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 interface CalendarEvent {
   id: string;
@@ -19,9 +19,8 @@ interface CalendarEvent {
 }
 
 const TIME_SLOTS = [
-  '6 AM', '8 AM', '10 AM', '12 PM', 
-  '2 PM', '4 PM', '6 PM', '8 PM', 
-  '10 PM', '12 AM', '2 AM'
+  '12 AM', '2 AM', '4 AM', '6 AM', '8 AM', '10 AM', 
+  '12 PM', '2 PM', '4 PM', '6 PM', '8 PM', '10 PM'
 ];
 
 const BLOCK_HEIGHT = 80;
@@ -30,65 +29,75 @@ export function CalendarView({ selectedDate }: { selectedDate: Date }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const getTimeSlot = (date: Date) => {
+    const hour = date.getHours();
+    // Return actual hour instead of forcing into 6 AM or 2 AM slots
+    return `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
   };
 
-  useEffect(() => {
-    fetchTransitions();
-  }, [selectedDate]);
+  const renderEvent = (event: CalendarEvent) => {
+    const formattedDuration = new Date(event.duration * 1000)
+      .toISOString()
+      .substr(11, 8);
+
+    return (
+      <View key={event.id} style={styles.event}>
+        <ThemedText style={styles.eventTitle}>
+          {event.title} ({formattedDuration})
+        </ThemedText>
+        <ThemedText style={styles.eventTime}>
+          {format(event.startTime, 'h:mm a')}
+        </ThemedText>
+      </View>
+    );
+  };
 
   const fetchTransitions = async () => {
     try {
+      // Use local timezone dates
       const dayStart = new Date(selectedDate);
-      dayStart.setHours(0, 0, 0, 0); // Start at midnight instead of 2 AM
-
+      dayStart.setHours(0, 0, 0, 0);
+      
       const dayEnd = new Date(selectedDate);
-      dayEnd.setHours(23, 59, 59, 999); // End at end of day
+      dayEnd.setHours(23, 59, 59, 999);
 
       console.log('Fetching transitions for:', {
-        start: dayStart.toISOString(),
-        end: dayEnd.toISOString()
+        start: dayStart.toLocaleString(),
+        end: dayEnd.toLocaleString()
       });
 
       const transitionsRef = collection(db, 'archivedTransitions');
       const q = query(
         transitionsRef,
         where('startTime', '>=', dayStart),
-        where('startTime', '<=', dayEnd)
+        where('startTime', '<=', dayEnd),
+        orderBy('startTime', 'asc')
       );
 
       const querySnapshot = await getDocs(q);
-      console.log('Found documents:', querySnapshot.size);
-
       const transitionEvents: CalendarEvent[] = [];
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log('Document data:', data);
+        const startTime = data.startTime?.toDate();
+        
+        if (startTime) {
+          console.log('Event time:', {
+            title: data.title,
+            time: startTime.toLocaleString(),
+            hour: startTime.getHours()
+          });
 
-        // Safely handle the startTime
-        let startTime: Date;
-        try {
-          startTime = data.startTime?.toDate?.() || new Date(data.startTime);
-        } catch (e) {
-          console.error('Error parsing startTime:', e);
-          startTime = new Date(); // Fallback to current time if parsing fails
+          transitionEvents.push({
+            id: doc.id,
+            title: data.title || `Transition ${data.number}`,
+            startTime,
+            duration: Number(data.elapsedTime) || 0,
+            tasks: Array.isArray(data.tasks) ? data.tasks : []
+          });
         }
-
-        transitionEvents.push({
-          id: doc.id,
-          title: data.title || `Transition ${data.number}`,
-          startTime,
-          duration: Number(data.elapsedTime) || 0,
-          tasks: Array.isArray(data.tasks) ? data.tasks : []
-        });
       });
 
-      console.log('Processed events:', transitionEvents);
       setEvents(transitionEvents);
     } catch (error) {
       console.error('Error fetching transitions:', error);
@@ -105,6 +114,10 @@ export function CalendarView({ selectedDate }: { selectedDate: Date }) {
     });
   };
 
+  useEffect(() => {
+    fetchTransitions();
+  }, [selectedDate]);
+
   return (
     <>
       <ScrollView style={styles.container}>
@@ -120,9 +133,7 @@ export function CalendarView({ selectedDate }: { selectedDate: Date }) {
                   style={styles.event}
                   onPress={() => setSelectedEvent(event)}
                 >
-                  <ThemedText style={styles.eventTitle} numberOfLines={2}>
-                    {event.title} ({formatDuration(event.duration)})
-                  </ThemedText>
+                  {renderEvent(event)}
                 </Pressable>
               ))}
             </View>
@@ -142,7 +153,7 @@ export function CalendarView({ selectedDate }: { selectedDate: Date }) {
               {selectedEvent?.title}
             </ThemedText>
             <ThemedText style={styles.modalTime}>
-              {selectedEvent && `Duration: ${formatDuration(selectedEvent.duration)}`}
+              {selectedEvent && `Duration: ${new Date(selectedEvent.duration * 1000).toISOString().substr(11, 8)}`}
             </ThemedText>
             <ScrollView style={styles.taskList}>
               {selectedEvent?.tasks.map(task => (
@@ -202,6 +213,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  eventTime: {
+    color: '#666',
+    fontSize: 12,
   },
   modalContainer: {
     flex: 1,

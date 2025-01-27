@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Alert } from 'react-native';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 
 export interface Task {
@@ -26,7 +26,7 @@ interface TaskContextType {
   toggleTrap: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
   editTask: (taskId: string, newTitle: string) => void;
-  archiveTransition: (elapsedTime: number) => Promise<void>;
+  archiveTransition: (elapsedTime: number, title: string) => Promise<void>;
   updateTransitionTitle: (newTitle: string) => Promise<void>;
 }
 
@@ -173,33 +173,52 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     await updateFirebaseTransition(updatedTransition);
   };
 
-  const archiveTransition = async (elapsedTime: number) => {
+  const archiveTransition = async (elapsedTime: number, title: string) => {
     try {
-      const archiveData = {
-        id: currentTransition.id,
+      // Get the actual current time
+      const now = new Date();
+      console.log('Current time:', now.toLocaleString());
+
+      const archiveDoc = {
         number: currentTransition.number,
-        tasks: currentTransition.tasks,
-        startTime: currentTransition.startTime,
-        completedAt: new Date(),
-        elapsedTime
+        title: title || `Transition ${currentTransition.number}`,
+        tasks: currentTransition.tasks.map(task => ({
+          id: task.id,
+          title: task.title,
+          completed: !!task.completed,
+          isTrap: !!task.isTrap
+        })),
+        startTime: serverTimestamp(), // Use serverTimestamp for consistent timing
+        elapsedTime: Number(elapsedTime) || 0,
+        createdAt: serverTimestamp(), // Add this for debugging
       };
+
+      // Log the document we're trying to save
+      console.log('Archiving document:', archiveDoc);
+
+      // Try to save and immediately verify
+      const docRef = await addDoc(collection(db, 'archivedTransitions'), archiveDoc);
+      const savedDoc = await getDoc(docRef);
       
-      await addDoc(collection(db, 'archivedTransitions'), archiveData);
-      
+      if (savedDoc.exists()) {
+        console.log('Verified saved document:', savedDoc.data());
+      } else {
+        console.error('Document not found after saving');
+      }
+
+      // Create new transition
       const newTransition = {
         id: Date.now().toString(),
         number: currentTransition.number + 1,
+        title: `Transition ${currentTransition.number + 1}`,
         tasks: [],
-        startTime: new Date()
+        startTime: serverTimestamp()
       };
 
-      const activeTransitionRef = doc(db, 'activeTransition', 'current');
-      await setDoc(activeTransitionRef, newTransition);
-      
+      await setDoc(doc(db, 'activeTransition', 'current'), newTransition);
       setCurrentTransition(newTransition);
     } catch (error) {
       console.error('Error archiving transition:', error);
-      Alert.alert('Error', 'Failed to archive transition');
     }
   };
 
